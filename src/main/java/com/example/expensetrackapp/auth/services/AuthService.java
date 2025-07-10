@@ -4,14 +4,21 @@ import com.example.expensetrackapp.auth.dao.UserDAO;
 
 import com.example.expensetrackapp.auth.models.User;
 
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.UUID;
+
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.example.expensetrackapp.auth.dao.RefreshTokenDAO;
 
 public class AuthService {
 	private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 	private UserDAO userDao;
 	private JwtService jwtService;
+	
 
 	public AuthService() {
 		this.userDao = new UserDAO();
@@ -43,7 +50,7 @@ public class AuthService {
 		return success;
 	}
 
-	public String loginUser(String username, String password) {
+	public String[] loginUser(String username, String password, String userAgent, String ipAddress) throws SQLException {
 
 		User userExist = userDao.getUsersByUsername(username);
 		if (userExist == null) {
@@ -55,7 +62,24 @@ public class AuthService {
 		// Compare password hashed
 		if ((BCrypt.checkpw(password, userExist.getPassword()))) {
 			logger.info("User '{}' login successfully");
-			return jwtService.generateToken(username, userExist.getRole());
+			
+			long expiresAtLong = JwtService.EXPIRATION_TIME_REFRESH;
+			Timestamp expiresAt = new Timestamp(expiresAtLong);
+			
+			String accessToken = jwtService.generateAccessToken(username, password);
+			String refreshToken = jwtService.generateRefreshToken(username, accessToken);
+			
+			// Update refresh token table
+			String userIdStr = userExist.getUserId(); // trả về String
+			UUID userId = UUID.fromString(userIdStr); 
+			try {
+				RefreshTokenDAO.saveRefreshToken(userId, refreshToken, userAgent, ipAddress, expiresAt);
+			} catch (SQLException e) {
+				logger.error("Fail to save refresh token table", e);
+			}
+			
+			
+			return new String[] {accessToken, refreshToken};
 		} else {
 			logger.warn("Login failed: Invalid password for user '{}'", username);
 			return null;

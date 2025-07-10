@@ -23,14 +23,24 @@ public class JwtService {
 	public static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(Decoders.BASE64URL.decode(SECRET_STRING));
 
 	// Effect time for 15 minutes
-	private static final long EXPIRATION_TIME = 900_000;
+	private static final long EXPIRATION_TIME_ACCESS = 900_000;
+	public static final long EXPIRATION_TIME_REFRESH = 432_000_000;
 
-	public String generateToken(String username, String role) {
+	public String generateAccessToken(String username, String role) {
 		Map<String, Object> claims = new HashMap<>();
 		claims.put("role", role); // Thêm thông tin vai trò vào token
 
 		return Jwts.builder().claims(claims).subject(username)
-				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME_ACCESS))
+				.issuedAt(new Date(System.currentTimeMillis())).signWith(SECRET_KEY).compact();
+	}
+	
+	public String generateRefreshToken(String username, String role) {
+		Map<String, Object> claims = new HashMap<>();
+		claims.put("role", role); // Thêm thông tin vai trò vào token
+
+		return Jwts.builder().claims(claims).subject(username)
+				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME_REFRESH))
 				.issuedAt(new Date(System.currentTimeMillis())).signWith(SECRET_KEY).compact();
 	}
 

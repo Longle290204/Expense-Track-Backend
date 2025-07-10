@@ -31,7 +31,7 @@ public class UserDAO {
 			if (rs.next()) {
 				user = new User();
 
-				user.setId(rs.getString("user_id"));
+				user.setUserId(rs.getString("user_id"));
 				user.setUsername(rs.getString("username"));
 				user.setPassword(rs.getString("password"));
 				logger.info("check lỗi uẻiosuahfuioasdhfuihsd", rs.getString("password"));

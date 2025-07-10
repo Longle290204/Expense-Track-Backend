@@ -108,25 +108,34 @@ public class AuthServlet extends HttpServlet {
 				return;
 			}
 
-			String jwtToken = authService.loginUser(username, password);
+			// Get user-agent & IP
+			String userAgent = request.getHeader("User-Agent");
+			String ipAddress = request.getRemoteAddr();
+			
+			
 
-			if (jwtToken != null) {
+			String[] tokens = authService.loginUser(username, password, userAgent, ipAddress);
+			String accessToken = tokens[0];
+			String refreshToken = tokens[1];
+
+			if (tokens != null) {
 				LoginResponse loginResponse = new LoginResponse();
 				loginResponse.setUsername(username);
-				loginResponse.setToken(jwtToken);
+				loginResponse.setAccessToken(accessToken);
+				loginResponse.setRefreshToken(refreshToken);
 				loginResponse.setSuccess(true);
-				loginResponse.setMessage("Login successfully!"); // Sửa chính tả "succesfully" -> "successfully"
+				loginResponse.setMessage("Login successfully!");
 
-				response.setStatus(HttpServletResponse.SC_OK); // 200 OK cho đăng nhập thành công
+				response.setStatus(HttpServletResponse.SC_OK);
 				// Chuyển đổi đối tượng loginResponse thành JSON và gửi về client
 				out.print(objectMapper.writeValueAsString(loginResponse));
 			} else {
-				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401 Unauthorized
+				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 				out.print("{\"success\": false, \"message\": \"Invalid credentials.\"}");
 			}
-		} catch (Exception e) { // Bắt các Exception khác có thể xảy ra trong quá trình xử lý
+		} catch (Exception e) { //
 			logger.error("Error during login", e);
-			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR); // 500 Internal Server Error
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			out.print("{\"success\": false, \"message\": \"An error occurred during login.\"}");
 		}
 	}
