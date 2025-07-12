@@ -40,6 +40,9 @@ public class AuthServlet extends HttpServlet {
 
 		response.setContentType("application/json");
 		response.setCharacterEncoding("UTF-8");
+		response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+		response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
+		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 		PrintWriter out = response.getWriter();
 
 		String pathInfor = request.getPathInfo();
@@ -111,8 +114,6 @@ public class AuthServlet extends HttpServlet {
 			// Get user-agent & IP
 			String userAgent = request.getHeader("User-Agent");
 			String ipAddress = request.getRemoteAddr();
-			
-			
 
 			String[] tokens = authService.loginUser(username, password, userAgent, ipAddress);
 			String accessToken = tokens[0];
@@ -138,5 +139,17 @@ public class AuthServlet extends HttpServlet {
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			out.print("{\"success\": false, \"message\": \"An error occurred during login.\"}");
 		}
+	}
+
+	@Override
+	protected void doOptions(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		// Trả lại đầy đủ header CORS
+		response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+		response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
+		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+		response.setHeader("Access-Control-Allow-Credentials", "true"); // nếu dùng cookie
+
+		response.setStatus(HttpServletResponse.SC_OK);
 	}
 }
