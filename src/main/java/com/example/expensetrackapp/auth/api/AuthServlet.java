@@ -3,6 +3,7 @@ package com.example.expensetrackapp.auth.api;
 import java.io.IOException;
 
 import java.io.PrintWriter;
+import java.sql.SQLException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,10 +14,14 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.example.expensetrackapp.auth.models.ExistsRequest;
+import com.example.expensetrackapp.auth.models.ExistsResponse;
 import com.example.expensetrackapp.auth.models.LoginRequest;
 import com.example.expensetrackapp.auth.models.LoginResponse;
 import com.example.expensetrackapp.auth.models.RegisterRequest;
 import com.example.expensetrackapp.auth.services.AuthService;
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebServlet("/api/auth/*")
@@ -60,6 +65,11 @@ public class AuthServlet extends HttpServlet {
 		case "/login":
 			handleLogin(request, response, out);
 			break;
+		case "/checkIfExist":
+
+			handleCheckIfExist(request, response, out);
+
+			break;
 		default:
 			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
 			out.print("{\"success\": false, \"message\": \"API endpoint not found.\"}");
@@ -75,14 +85,14 @@ public class AuthServlet extends HttpServlet {
 			RegisterRequest registerRequest = objectMapper.readValue(request.getReader(), RegisterRequest.class);
 
 			if (registerRequest.getUsername() == null || registerRequest.getPassword() == null
-					|| registerRequest.getEmail() == null) {
+					|| registerRequest.getEmail() == null || registerRequest.getConfirmPassword() == null) {
 				out.print("{\"success\": false, \"message\": \"Username and password are required.\"}");
 				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				return;
 			}
 
 			if (authService.registerUser(registerRequest.getUsername(), registerRequest.getPassword(),
-					registerRequest.getEmail())) {
+					registerRequest.getEmail(), registerRequest.getConfirmPassword())) {
 				response.setStatus(HttpServletResponse.SC_CREATED);
 				out.print("{\"success\": true, \"message\": \"Register is successfully\".}");
 			} else {
@@ -138,6 +148,34 @@ public class AuthServlet extends HttpServlet {
 			logger.error("Error during login", e);
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			out.print("{\"success\": false, \"message\": \"An error occurred during login.\"}");
+		}
+	}
+
+	public void handleCheckIfExist(HttpServletRequest request, HttpServletResponse response, PrintWriter out) {
+		response.setContentType("application/json");
+		response.setCharacterEncoding("UTF-8");
+
+		try {
+			// Parse request JSON vào object
+			ExistsRequest existsRequest = objectMapper.readValue(request.getReader(), ExistsRequest.class);
+
+			// Gọi service để lấy kết quả
+			ExistsResponse result = authService.existsRespone(existsRequest.getField(), existsRequest.getValue());
+
+			// Trả JSON về client
+			out.print(objectMapper.writeValueAsString(result));
+		} catch (StreamReadException | DatabindException e) {
+			e.printStackTrace();
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			out.print("{\"error\":\"Invalid request format\"}");
+		} catch (SQLException e) {
+			e.printStackTrace();
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			out.print("{\"error\":\"Database error\"}");
+		} catch (IOException e) {
+			e.printStackTrace();
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			out.print("{\"error\":\"Server error\"}");
 		}
 	}
 
