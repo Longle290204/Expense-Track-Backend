@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.example.expensetrackapp.auth.config.DBConnection;
+import com.example.expensetrackapp.config.DBConnection;
 
 public class RefreshTokenDAO {
 	private static final Logger logger = LoggerFactory.getLogger(RefreshTokenDAO.class);

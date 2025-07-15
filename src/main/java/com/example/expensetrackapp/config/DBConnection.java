@@ -1,4 +1,4 @@
-package com.example.expensetrackapp.auth.config;
+package com.example.expensetrackapp.config;
 
 import java.sql.Connection;
 import java.sql.SQLException;

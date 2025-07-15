@@ -45,9 +45,7 @@ public class AuthServlet extends HttpServlet {
 
 		response.setContentType("application/json");
 		response.setCharacterEncoding("UTF-8");
-		response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-		response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
-		response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
 		PrintWriter out = response.getWriter();
 
 		String pathInfor = request.getPathInfo();

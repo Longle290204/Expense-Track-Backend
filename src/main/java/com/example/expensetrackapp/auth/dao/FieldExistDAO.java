@@ -9,7 +9,7 @@ import java.sql.SQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.example.expensetrackapp.auth.config.DBConnection;
+import com.example.expensetrackapp.config.DBConnection;
 
 public class FieldExistDAO {
 	private static final Logger logger = LoggerFactory.getLogger(FieldExistDAO.class);
