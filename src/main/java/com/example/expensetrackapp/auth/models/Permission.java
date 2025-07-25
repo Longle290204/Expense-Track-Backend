@@ -1,24 +1,25 @@
 package com.example.expensetrackapp.auth.models;
 
 import java.util.Objects;
+import java.util.UUID;
 
 public class Permission {
-	private String permission_id;
+	private UUID permission_id;
 	private String permission_name;
 
 	public Permission() {
 	}
 
-	public Permission(String permission_id, String permission_name) {
+	public Permission(UUID permission_id, String permission_name) {
 		this.permission_id = permission_id;
 		this.permission_name = permission_name;
 	}
 
-	public String getPermissionId() {
+	public UUID getPermissionId() {
 		return permission_id;
 	}
 
-	public void setPermissionId(String permission_id) {
+	public void setPermissionId(UUID permission_id) {
 		this.permission_id = permission_id;
 	}
 

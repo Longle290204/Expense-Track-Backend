@@ -2,6 +2,7 @@ package com.example.expensetrackapp.auth.api;
 
 import java.io.IOException;
 
+
 import java.io.PrintWriter;
 import java.sql.SQLException;
 
@@ -14,6 +15,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.example.expensetrackapp.api.BaseApiServlet;
 import com.example.expensetrackapp.auth.models.ExistsRequest;
 import com.example.expensetrackapp.auth.models.ExistsResponse;
 import com.example.expensetrackapp.auth.models.LoginRequest;
@@ -25,7 +27,7 @@ import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebServlet("/api/auth/*")
-public class AuthServlet extends HttpServlet {
+public class AuthServlet extends BaseApiServlet {
 	private static final long serialVersionUID = 1L;
 
 	private static final Logger logger = LoggerFactory.getLogger(AuthServlet.class);
@@ -137,7 +139,7 @@ public class AuthServlet extends HttpServlet {
 
 				response.setStatus(HttpServletResponse.SC_OK);
 				// Chuyển đổi đối tượng loginResponse thành JSON và gửi về client
-				out.print(objectMapper.writeValueAsString(loginResponse));
+				writeJsonResponse(response, loginResponse);
 			} else {
 				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 				out.print("{\"success\": false, \"message\": \"Invalid credentials.\"}");

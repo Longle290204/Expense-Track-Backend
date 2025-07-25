@@ -1,12 +1,15 @@
 package com.example.expensetrackapp.auth.services;
 
 import com.example.expensetrackapp.auth.dao.UserDAO;
+
 import com.example.expensetrackapp.auth.models.ExistsResponse;
 import com.example.expensetrackapp.auth.models.User;
 
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.UUID;
+
+import javax.servlet.http.Cookie;
 
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
@@ -73,8 +76,8 @@ public class AuthService {
 		if (userExist == null) {
 			logger.warn("Login failed: Username '{}' not registerd", username);
 		}
-
-		logger.info("Get password login '{}'", userExist);
+		// Get user_id from user object
+		String user_id = userExist.getUser_id();		
 
 		// Compare password hashed
 		if ((BCrypt.checkpw(password, userExist.getPassword()))) {
@@ -83,11 +86,14 @@ public class AuthService {
 			long expiresAtLong = JwtService.EXPIRATION_TIME_REFRESH;
 			Timestamp expiresAt = new Timestamp(expiresAtLong);
 
-			String accessToken = jwtService.generateAccessToken(username, password);
+			
+			String accessToken = jwtService.generateAccessToken(user_id, username);
 			String refreshToken = jwtService.generateRefreshToken(username, accessToken);
+			
+			
 
 			// Update refresh token table
-			String userIdStr = userExist.getUserId(); // trả về String
+			String userIdStr = userExist.getUser_id(); // trả về String
 			UUID userId = UUID.fromString(userIdStr);
 			try {
 				RefreshTokenDAO.saveRefreshToken(userId, refreshToken, userAgent, ipAddress, expiresAt);

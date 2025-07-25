@@ -1,33 +1,45 @@
 package com.example.expensetrackapp.auth.models;
 
 import java.sql.Timestamp;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 public class User {
+
 	private String user_id;
 	private String username;
 	private String password;
 	private String email;
-	private String role;
 	private Timestamp createdAt;
+	private Timestamp updatedAt;
+	Set<Role> roles = new HashSet<>();
 
 	public User() {
 	}
 
-	public User(String user_id, String username, String password, String email, String role, Timestamp createdAt) {
+	@Override
+	public int hashCode() {
+		return Objects.hash(user_id);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		User other = (User) obj;
+		return Objects.equals(user_id, other.user_id);
+	}
+
+	public User(String user_id, String username, String password, String email) {
 		this.user_id = user_id;
 		this.username = username;
 		this.password = password;
 		this.email = email;
-		this.role = role;
-		this.createdAt = createdAt;
-	}
-
-	public void setUserId(String user_id) {
-		this.user_id = user_id;
-	}
-
-	public String getUserId() {
-		return user_id;
 	}
 
 	public void setUsername(String username) {
@@ -54,19 +66,35 @@ public class User {
 		return email;
 	}
 
-	public void setRole(String role) {
-		this.role = role;
-	}
-
-	public String getRole() {
-		return role;
-	}
-
 	public Timestamp getCreatedAt() {
 		return createdAt;
 	}
 
 	public void setCreatedAt(Timestamp createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public Timestamp getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(Timestamp updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+
+	public String getUser_id() {
+		return user_id;
+	}
+
+	public void setUser_id(String user_id) {
+		this.user_id = user_id;
+	}
+
+	public Set<Role> getRoles() {
+		return roles;
+	}
+
+	public void setRoles(Set<Role> roles) {
+		this.roles = roles;
 	}
 }

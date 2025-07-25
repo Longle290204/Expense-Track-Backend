@@ -1,6 +1,5 @@
 package com.example.expensetrackapp.auth.models;
 
-import java.security.Permission;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -9,6 +8,7 @@ public class Role {
 	private String role_id;
 	private String role_name;
 	private Set<Permission> permissions = new HashSet<>();
+	private Boolean is_system;
 
 	public Role() {
 
@@ -43,24 +43,34 @@ public class Role {
 		this.permissions = permissions;
 	}
 
-	// equals() và hashCode()
+	
 	@Override
-	public boolean equals(Object o) {
-		if (this == o)
-			return true;
-		if (o == null || getClass() != o.getClass())
-			return false;
-		Role role = (Role) o;
-		return role_id == role.role_id && Objects.equals(role_name, role.role_name);
+	public int hashCode() {
+		return Objects.hash(role_id);
 	}
 
 	@Override
-	public int hashCode() {
-		return Objects.hash(role_id, role_name);
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Role other = (Role) obj;
+		return Objects.equals(role_id, other.role_id);
 	}
 
 	@Override
 	public String toString() {
 		return "Role{" + "role_id=" + role_id + ", role_name='" + role_name + '\'' + '}';
+	}
+	
+	public Boolean getIsSystemRole() {
+		return is_system;
+	}
+	
+	public void setIsSystemRole(Boolean is_system) {
+		this.is_system = is_system;
 	}
 }

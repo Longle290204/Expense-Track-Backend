@@ -29,14 +29,56 @@ public class DatabaseInitialize implements ServletContextListener {
 			pstmt = connect.prepareStatement("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";");
 
 			// SQL table user
-			String createTableCommand = "CREATE TABLE IF NOT EXISTS users" + "("
+			String createTableUserCmd = "CREATE TABLE IF NOT EXISTS users" + "("
 					+ "user_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY," + "username VARCHAR(255) NOT NULL,"
-					+ "email VARCHAR(255) NOT NULL," + "role VARCHAR(255) DEFAULT 'USER'," + "password VARCHAR(255),"
-					+ "createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP" + ")";
-			pstmt = connect.prepareStatement(createTableCommand);
+					+ "email VARCHAR(255) NOT NULL, " + "password VARCHAR(255),"
+					+ "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+					+ "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" + ")";
+			pstmt = connect.prepareStatement(createTableUserCmd);
 			pstmt.executeUpdate();
 			pstmt.close();
 			logger.info("Table 'users' created.");
+
+			// SQL table group
+			String createTableGroupCmd = "CREATE TABLE IF NOT EXISTS groups (group_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, "
+					+ "group_name VARCHAR(50) NOT NULL, " + "created_by uuid NOT NULL, "
+					+ "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" + ")";
+			pstmt = connect.prepareStatement(createTableGroupCmd);
+			pstmt.executeUpdate();
+			pstmt.close();
+			logger.info("Table 'groups' created.");
+
+			String createTableUserGroupCmd = "CREATE TABLE IF NOT EXISTS user_groups (" + "group_id UUID NOT NULL, "
+					+ "user_id UUID NOT NULL, " + "joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+					+ "PRIMARY KEY (group_id, user_id), " + "FOREIGN KEY (user_id) REFERENCES users(user_id), "
+					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
+			pstmt = connect.prepareStatement(createTableUserGroupCmd);
+			pstmt.executeUpdate();
+			pstmt.close();
+			logger.info("Table 'user_groups' created.");
+
+			String createTableCategoriesCmd = "CREATE TABLE IF NOT EXISTS categories ("
+					+ "    category_id UUID PRIMARY KEY, " + "    name VARCHAR(20) NOT NULL, "
+					+ "    type VARCHAR(10) NOT NULL, " + "    user_id UUID, "
+					+ "    FOREIGN KEY (user_id) REFERENCES users(user_id)" + ")";
+			pstmt = connect.prepareStatement(createTableCategoriesCmd);
+			pstmt.executeUpdate();
+			pstmt.close();
+			logger.info("Table 'categories' created.");
+
+			String createTableBudgetCmd = "CREATE TABLE IF NOT EXISTS budgets ("
+					+ "budget_id UUID DEFAULT uuid_generate_v4(), " + "user_id UUID NOT NULL, " + "wallet_id UUID, "
+					+ "group_id UUID, " + "category_id UUID, " + "amount DECIMAL(10, 2) NOT NULL, "
+					+ "start_date DATE NOT NULL, " + "end_date DATE NOT NULL, "
+					+ "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " + "PRIMARY KEY (budget_id), "
+					+ "FOREIGN KEY (user_id) REFERENCES users(user_id), "
+					+ "FOREIGN KEY (wallet_id) REFERENCES wallets(wallet_id), "
+					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id), "
+					+ "FOREIGN KEY (category_id) REFERENCES categories(category_id)" + ")";
+			pstmt = connect.prepareStatement(createTableBudgetCmd);
+			pstmt.executeUpdate();
+			pstmt.close();
+			logger.info("Table 'budget' created.");
 
 			// SQL refresh token table
 			String createRefreschTokenCmd = "CREATE TABLE IF NOT EXISTS refresh_tokens " + "("
@@ -72,8 +114,8 @@ public class DatabaseInitialize implements ServletContextListener {
 
 			// SQL role table
 			String createRoleTableCmd = "CREATE TABLE IF NOT EXISTS roles " + "("
-					+ "role_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, " + "name varchar(50) NOT NULL UNIQUE "
-					+ ")";
+					+ "role_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, "
+					+ "role_name varchar(50) NOT NULL UNIQUE, " + "is_system BOOLEAN, " + "group_id uuid" + ")";
 			pstmt = connect.prepareStatement(createRoleTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();
@@ -82,27 +124,31 @@ public class DatabaseInitialize implements ServletContextListener {
 			// SQL permissions table
 			String createPermissionTableCmd = "CREATE TABLE IF NOT EXISTS permissions " + "("
 					+ "permission_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, "
-					+ "name varchar(50) NOT NULL UNIQUE" + ")";
+					+ "permission_name varchar(50) NOT NULL UNIQUE, " + "group_name varchar(50) NOT NULL, "
+					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
 			pstmt = connect.prepareStatement(createPermissionTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();
 			logger.info("Table 'permissions' created");
 
 			// SQL user_roles table
-			String createUserRoleTableCmd = "CREATE TABLE IF NOT EXISTS user_roles " + "(" + "user_id UUID NOT NULL, "
-					+ "role_id UUID NOT NULL, " + "PRIMARY KEY (user_id, role_id),"
-					+ "FOREIGN KEY (user_id) REFERENCES users(user_id),"
-					+ "FOREIGN KEY (role_id) REFERENCES roles(role_id)" + ")";
+			String createUserRoleTableCmd = "CREATE TABLE IF NOT EXISTS user_roles (" + "user_id UUID NOT NULL, "
+					+ "role_id UUID NOT NULL, " + "group_id UUID NOT NULL, "
+					+ "PRIMARY KEY (user_id, role_id, group_id), " + "FOREIGN KEY (user_id) REFERENCES users(user_id), "
+					+ "FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE CASCADE, "
+					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
 			pstmt = connect.prepareStatement(createUserRoleTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();
 			logger.info("Table 'user_roles' created");
 
 			// SQL role_permisstions table
-			String createRolePermissionTableCmd = "CREATE TABLE IF NOT EXISTS role_permissions " + "("
-					+ "role_id UUID NOT NULL, " + "permission_id UUID NOT NULL, "
-					+ "PRIMARY KEY (role_id, permission_id)," + "FOREIGN KEY (role_id) REFERENCES roles(role_id),"
-					+ "FOREIGN KEY (permission_id) REFERENCES permissions(permission_id)" + ")";
+			String createRolePermissionTableCmd = "CREATE TABLE IF NOT EXISTS role_permissions ("
+					+ "role_id UUID NOT NULL, " + "permission_id UUID NOT NULL, " + "group_id UUID, "
+					+ "PRIMARY KEY (role_id, permission_id, group_id),"
+					+ "FOREIGN KEY (role_id) REFERENCES roles(role_id),"
+					+ "FOREIGN KEY (permission_id) REFERENCES permissions(permission_id), "
+					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
 			pstmt = connect.prepareStatement(createRolePermissionTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();

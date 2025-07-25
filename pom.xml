@@ -19,6 +19,13 @@
 	</properties>
 
 	<dependencies>
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>2.15.2</version> <!-- hoặc version tương ứng với
+			jackson-core bạn đang dùng -->
+		</dependency>
+
 		<!-- Unit Test -->
 		<dependency>
 			<groupId>junit</groupId>

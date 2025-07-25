@@ -18,7 +18,7 @@ public class JwtService {
 	public static final Logger logger = LoggerFactory.getLogger(JwtService.class);
 
 	// Take JWT_SECRET from file .env
-	private static final Dotenv dotenv = Dotenv.configure().directory("D:/java-servlet/expensetrackapp").load();
+	private static final Dotenv dotenv = Dotenv.configure().directory("C:\\Users\\Admin\\git\\repository\\expensetrackapp").load();
 	private static final String SECRET_STRING = dotenv.get("JWT_SECRET");
 	public static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(Decoders.BASE64URL.decode(SECRET_STRING));
 
@@ -26,18 +26,18 @@ public class JwtService {
 	private static final long EXPIRATION_TIME_ACCESS = 900_000;
 	public static final long EXPIRATION_TIME_REFRESH = 432_000_000;
 
-	public String generateAccessToken(String username, String role) {
+	public String generateAccessToken(String user_id , String username) {
 		Map<String, Object> claims = new HashMap<>();
-		claims.put("role", role); // Thêm thông tin vai trò vào token
+		claims.put("user_id", user_id); // Thêm thông tin vai trò vào token
 
 		return Jwts.builder().claims(claims).subject(username)
 				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME_ACCESS))
 				.issuedAt(new Date(System.currentTimeMillis())).signWith(SECRET_KEY).compact();
 	}
 	
-	public String generateRefreshToken(String username, String role) {
+	public String generateRefreshToken(String user_id, String username) {
 		Map<String, Object> claims = new HashMap<>();
-		claims.put("role", role); // Thêm thông tin vai trò vào token
+		claims.put("user_id", user_id); // Thêm thông tin vai trò vào token
 
 		return Jwts.builder().claims(claims).subject(username)
 				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME_REFRESH))
