@@ -40,15 +40,29 @@ public class GroupService {
 	 */
 	public boolean createGroupService(String group_name, String user_id) throws SQLException {
 		
-		Group groupExist = groupDao.getGroupById(user_id);
-		if (groupExist != null) {
-			logger.warn("Creat failed: Group already exists");
-			return false;
-		}
+	    // Kiểm tra trùng tên nhóm (tuỳ yêu cầu logic)
+	    Group groupExist = groupDao.getGroupById(user_id);
+	    if (groupExist != null) {
+	        logger.warn("Create failed: Group already exists");
+	        return false;
+	    }
 
-		boolean success = groupDao.createGroupDao(group_name, user_id);
-		logger.info("success: {}", success);
-		return success;
+	    // 1. Tạo nhóm và nhận group_id
+	    UUID newGroupId = groupDao.createGroupDao(group_name, user_id);
+	   
+	    // 2. Clone role hệ thống vào nhóm vừa tạo
+	   groupDao.cloneSystemRolesToGroupDao(newGroupId);
+
+	    return true;
+	}
+	
+	public void cloneSystemRolesToGroupService(UUID groupId) {
+		try {
+			groupDao.cloneSystemRolesToGroupDao(groupId);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		
 	}
 
 	/**
@@ -57,28 +71,71 @@ public class GroupService {
 	 * @param group_id
 	 */
 	public void getUserInGroupService(UUID user_id, UUID group_id) {
-  		try {
+		try {
 			groupDao.getUserInGroupByIdDao(user_id, group_id);
 		} catch (Exception e) {
-			
+
+		}
+	}
+
+	public List<Group> getAllGroupService() {
+		try {
+			List<Group> groups = new ArrayList<>(groupDao.getAllGroupDao());
+
+			if (groups.isEmpty()) {
+				throw new RuntimeException("Can't get all group");
+			}
+
+			return groups;
+
+		} catch (SQLException e) {
+			e.printStackTrace();
+			logger.error("Error when get all permission", e);
+
+			throw new RuntimeException("System error when get all groups.");
+		}
+	}
+
+	public void removeGroupById(UUID group_id) {
+		try {
+			groupDao.removeGroupById(group_id);
+		} catch (SQLException e) {
+			e.printStackTrace();
+			logger.error("Error when remove group", e);
+
+			throw new RuntimeException("System error when remove group.");
 		}
 	}
 	
-	public List<Group> getAllGroupService() {
-	    try {
-	        List<Group> groups = new ArrayList<>(groupDao.getAllGroupDao());
+	/**
+	 * 
+	 * @return
+	 */
+	public List<Group> getAllGroupUserIdService(UUID user_id) {
+		try {
+			List<Group> groups = new ArrayList<>(groupDao.getAllGroupUserIdDao(user_id));
 
-	        if (groups.isEmpty()) {
-	            throw new RuntimeException("Can't get all group");
-	        }
+			if (groups.isEmpty()) {
+				throw new RuntimeException("Can't get all group");
+			}
 
-	        return groups;
+			return groups;
 
-	    } catch (SQLException e) {
-	        e.printStackTrace();
-	        logger.error("Error when get all permission", e);
+		} catch (SQLException e) {
+			e.printStackTrace();
+			logger.error("Error when get all group users", e);
 
 			throw new RuntimeException("System error when get all groups.");
-	    }
+		}
+	}
+	
+	public void updateGroupNameService(String group_name, UUID group_id) {
+		logger.info("group_name {}", group_name);
+		
+		try {
+			groupDao.updateGroupNameDao(group_name, group_id);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 	}
 }

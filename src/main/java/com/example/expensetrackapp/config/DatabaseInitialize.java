@@ -113,9 +113,9 @@ public class DatabaseInitialize implements ServletContextListener {
 			logger.info("Table 'wallets' created");
 
 			// SQL role table
-			String createRoleTableCmd = "CREATE TABLE IF NOT EXISTS roles " + "("
-					+ "role_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, "
-					+ "role_name varchar(50) NOT NULL UNIQUE, " + "is_system BOOLEAN, " + "group_id uuid" + ")";
+			String createRoleTableCmd = "CREATE TABLE IF NOT EXISTS roles ("
+					+ "role_id uuid DEFAULT uuid_generate_v4() PRIMARY KEY, " + "role_name varchar(50) NOT NULL, "
+					+ "is_system BOOLEAN, " + "group_id uuid, " + "UNIQUE (group_id, role_name)" + ")";
 			pstmt = connect.prepareStatement(createRoleTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();

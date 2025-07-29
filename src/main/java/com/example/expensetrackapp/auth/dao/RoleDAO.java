@@ -76,7 +76,7 @@ public class RoleDAO {
 				ResultSet rs = pstmt.executeQuery()) {
 
 			while (rs.next()) {
-				roles.add(new Role(rs.getString("role_id"), rs.getString("role_name")));
+				roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"), null));
 			}
 		}
 		return roles;
@@ -92,7 +92,7 @@ public class RoleDAO {
 	public List<Role> getAllRolesInGroup(String group_id) throws SQLException {
 		List<Role> roles = new ArrayList<>();
 
-		String sql = "SELECT role_id, role_name FROM roles WHERE group_id = ? ORDER BY role_name";
+		String sql = "SELECT role_id, role_name, group_id FROM roles WHERE group_id = ? ORDER BY role_name";
 
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql);) {
@@ -100,7 +100,8 @@ public class RoleDAO {
 			try (ResultSet rs = pstmt.executeQuery()) {
 
 				while (rs.next()) {
-					roles.add(new Role(rs.getString("role_id"), rs.getString("role_name")));
+					roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"),
+							UUID.fromString(rs.getString("group_id"))));
 				}
 			}
 
@@ -122,7 +123,7 @@ public class RoleDAO {
 			logger.warn("Role with ID {} and group ID {} not found", role_id, group_id);
 		}
 
-		String sql = "SELECT r.role_id, r.role_name, p.permission_id, p.permission_name " + "FROM roles r "
+		String sql = "SELECT r.role_id, r.role_name, r.group_id p.permission_id, p.permission_name " + "FROM roles r "
 				+ "LEFT JOIN role_permissions rp ON r.role_id = rp.role_id AND r.group_id = rp.group_id"
 				+ "LEFT JOIN permissions p ON rp.permission_id = p.permission_id AND rp.group_id = p.group_id"
 				+ "WHERE r.role_id = ? AND group_id = ?";
@@ -136,7 +137,8 @@ public class RoleDAO {
 				Set<Permission> permissions = new HashSet<>();
 				while (rs.next()) {
 					if (role == null) {
-						role = new Role(rs.getString("role_id"), rs.getString("role_name"));
+						role = new Role(rs.getString("role_id"), rs.getString("role_name"),
+								UUID.fromString(rs.getString("group_id")));
 					}
 					String permId = rs.getString("permission_id");
 					if (permId != null) {
@@ -373,7 +375,7 @@ public class RoleDAO {
 		}
 		return roles;
 	}
-	
+
 	/**
 	 * Gán thêm các vai trò cho một người dùng trong group riêng biệt
 	 * 
@@ -394,7 +396,7 @@ public class RoleDAO {
 			pstmt.setObject(2, role_id);
 			pstmt.setObject(3, group_id);
 			int rowUpdates = pstmt.executeUpdate();
-			
+
 			return rowUpdates > 0;
 		}
 	}

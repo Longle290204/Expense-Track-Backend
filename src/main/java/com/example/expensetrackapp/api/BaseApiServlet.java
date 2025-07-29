@@ -49,4 +49,5 @@ public abstract class BaseApiServlet extends HttpServlet {
 		response.setStatus(statusCode);
 		writeJsonResponse(response, Map.of("success", false, "message", message));
 	}
+
 }

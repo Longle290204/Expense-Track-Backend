@@ -26,11 +26,29 @@ public class JwtUtil {
 	 */
 	public static String extractUserId(String token) {
 		SecretKey key = JwtService.SECRET_KEY;
-	
+
 		try {
 			Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
 
 			return claims.get("user_id", String.class);
+		} catch (JwtException e) {
+			System.err.println("Invalid JWT token: " + e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * 
+	 * @param token
+	 * @return
+	 */
+	public static String extractUsername(String token) {
+		SecretKey key = JwtService.SECRET_KEY;
+
+		try {
+			Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+
+			return claims.get("username", String.class);
 		} catch (JwtException e) {
 
 		}

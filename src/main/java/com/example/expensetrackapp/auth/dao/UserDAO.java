@@ -167,7 +167,7 @@ public class UserDAO {
 					if (roleId != null) {
 						Role role = roleMap.get(roleId);
 						if (role == null) {
-							role = new Role(roleId, "ADMIN");
+							role = new Role(roleId, "ADMIN", null);
 							roleMap.put(roleId, role);
 							roles.add(role);
 						}
@@ -179,7 +179,7 @@ public class UserDAO {
 						}
 					}
 				}
-				
+
 				if (user != null) {
 					user.setRoles(roles);
 				}
@@ -189,6 +189,75 @@ public class UserDAO {
 		return user;
 	}
 
+	public List<User> getAllUsersWithRolAndPer(UUID group_id) throws SQLException {
+
+		String sql = "SELECT " + "  u.user_id, u.username, u.email, u.password, "
+				+ "  r.role_id, r.role_name, r.is_system, " + "  ug.joined_at, "
+				+ "  p.permission_id, p.permission_name " + "FROM user_groups ug "
+				+ "JOIN users u ON u.user_id = ug.user_id "
+				+ "LEFT JOIN user_roles ur ON ur.user_id = u.user_id AND ur.group_id = ug.group_id "
+				+ "LEFT JOIN roles r ON r.role_id = ur.role_id AND r.group_id = ug.group_id "
+				+ "LEFT JOIN role_permissions rp ON rp.role_id = r.role_id AND rp.group_id = r.group_id "
+				+ "LEFT JOIN permissions p ON p.permission_id = rp.permission_id " + "WHERE ug.group_id = ? "
+				+ "ORDER BY u.user_id;";
+
+		Map<String, User> userMap = new HashMap<>();
+		User user = null;
+
+		try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setObject(1, group_id);
+
+			try (ResultSet rs = pstmt.executeQuery()) {
+
+				while (rs.next()) {
+
+					String userId = rs.getString("user_id");
+					user = userMap.get(userId);
+					if (user == null) {
+						user = new User();
+						user.setUser_id(userId);
+						user.setUsername(rs.getString("username"));
+						user.setEmail(rs.getString("email"));
+						user.setPassword(rs.getString("password"));
+						user.setRoles(new HashSet<>());
+						userMap.put(userId, user);
+					}
+
+					String roleId = rs.getString("role_id");
+					if (roleId != null) {
+						Role role = user.getRoles().stream().filter(r -> r.getRoleId().equals(roleId)).findFirst()
+								.orElse(null);
+
+						if (role == null) {
+							role = new Role();
+							role.setRoleId(roleId);
+							role.setRoleName(rs.getString("role_name"));
+							role.setPermissions(new HashSet<>());
+							user.getRoles().add(role);
+						}
+
+						// Thêm permission vào role
+						String permIdStr = rs.getString("permission_id");
+						if (permIdStr != null) {
+							UUID permId = UUID.fromString(permIdStr);
+							String permName = rs.getString("permission_name");
+
+							Permission perm = new Permission();
+							perm.setPermissionId(permId);
+							perm.setPermissionName(permName);
+
+							role.getPermissions().add(perm);
+						}
+					}
+					logger.info("User: " + userId + ", RoleId: " + roleId);
+				}
+			}
+		}
+
+		return new ArrayList<>(userMap.values());
+	}
+
+//	rs.getString("email"), UUID.fromString(rs.getString("role_id")), rs.getString("")
 	/**
 	 * 
 	 * @return Trả về ArrayList chứa tất cả user
@@ -242,7 +311,7 @@ public class UserDAO {
 					String roleId = rs.getString("role_id");
 					String roleName = rs.getString("role_name");
 					if (roleId != null && roleName != null) {
-						roles.add(new Role(roleId, roleName));
+						roles.add(new Role(roleId, roleName, null));
 					}
 				}
 
@@ -331,12 +400,12 @@ public class UserDAO {
 		}
 	}
 
-	public boolean addUserToGroupDao(UUID group_id, UUID user_id) throws SQLException {
-		String sql = "INSERT INTO user_groups (group_id, user_id) VALUES (?, ?)";
+	public boolean addUserToGroupDao(UUID group_id, String email) throws SQLException {
+		String sql = "INSERT INTO user_groups (group_id, email) VALUES (?, ?)";
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql)) {
 			pstmt.setObject(1, group_id);
-			pstmt.setObject(2, user_id);
+			pstmt.setString(2, email);
 
 			int rowUpdate = pstmt.executeUpdate();
 			return rowUpdate > 0;

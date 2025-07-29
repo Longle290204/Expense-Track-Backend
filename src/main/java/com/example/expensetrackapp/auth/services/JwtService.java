@@ -23,7 +23,7 @@ public class JwtService {
 	public static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(Decoders.BASE64URL.decode(SECRET_STRING));
 
 	// Effect time for 15 minutes
-	private static final long EXPIRATION_TIME_ACCESS = 900_000;
+	private static final long EXPIRATION_TIME_ACCESS = 10_000;
 	public static final long EXPIRATION_TIME_REFRESH = 432_000_000;
 
 	public String generateAccessToken(String user_id , String username) {
@@ -35,11 +35,11 @@ public class JwtService {
 				.issuedAt(new Date(System.currentTimeMillis())).signWith(SECRET_KEY).compact();
 	}
 	
-	public String generateRefreshToken(String user_id, String username) {
+	public String generateRefreshToken(String user_id, String accessToken) {
 		Map<String, Object> claims = new HashMap<>();
 		claims.put("user_id", user_id); // Thêm thông tin vai trò vào token
 
-		return Jwts.builder().claims(claims).subject(username)
+		return Jwts.builder().claims(claims).subject(accessToken)
 				.expiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME_REFRESH))
 				.issuedAt(new Date(System.currentTimeMillis())).signWith(SECRET_KEY).compact();
 	}

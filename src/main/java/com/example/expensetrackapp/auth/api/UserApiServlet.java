@@ -2,6 +2,8 @@ package com.example.expensetrackapp.auth.api;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -50,6 +52,14 @@ public class UserApiServlet extends BaseApiServlet {
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
 			}
 			break;
+		case "/getAllUserWithRolesAndPermission":
+			try {
+				handleGetAllUserWithRolesAndPermission(request, response, out);
+			} catch (Exception e) {
+				logger.error("Error in handleGetAllUserWithRolesAndPermission", e);
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+			}
+			break;
 		default:
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Route not found in POST");
 			break;
@@ -78,18 +88,25 @@ public class UserApiServlet extends BaseApiServlet {
 		}
 	}
 
+	/**
+	 * 
+	 * @param request
+	 * @param response
+	 * @param out
+	 * @throws IOException
+	 */
 	public void handleAddUserToGroup(HttpServletRequest request, HttpServletResponse response, PrintWriter out)
 			throws IOException {
 
 		UserRequest userRequest = objectMapper.readValue(request.getReader(), UserRequest.class);
-		if (userRequest.getGroup_id() == null || userRequest.getUser_id() == null) {
+		if (userRequest.getGroup_id() == null || userRequest.getEmail() == null) {
 			out.print("{\"success\": false, \"message\": \"Enter missing data.\"}");
 			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 			return;
 		}
 
 		try {
-			userService.addUserToGroupService(userRequest.getGroup_id(), userRequest.getUser_id());
+			userService.addUserToGroupService(userRequest.getGroup_id(), userRequest.getEmail());
 			out.print("{\"success\": true, \"message\": \"Role has been added to the group.\"}");
 		} catch (RuntimeException e) {
 			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
@@ -97,6 +114,13 @@ public class UserApiServlet extends BaseApiServlet {
 		}
 	}
 
+	/**
+	 * 
+	 * @param request
+	 * @param response
+	 * @param out
+	 * @throws IOException
+	 */
 	public void handleGetUserWithRolesAndPermission(HttpServletRequest request, HttpServletResponse response,
 			PrintWriter out) throws IOException {
 		UserRequest userRequest = objectMapper.readValue(request.getReader(), UserRequest.class);
@@ -115,4 +139,33 @@ public class UserApiServlet extends BaseApiServlet {
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 		}
 	}
+
+	/**
+	 * 
+	 * @param request
+	 * @param response
+	 * @param out
+	 * @throws IOException
+	 */
+	public List<User> handleGetAllUserWithRolesAndPermission(HttpServletRequest request, HttpServletResponse response,
+			PrintWriter out) throws IOException {
+		UserRequest userRequest = objectMapper.readValue(request.getReader(), UserRequest.class);
+		if (userRequest.getGroup_id() == null) {
+			out.print("{\"success\": false, \"message\": \"Enter missing data.\"}");
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			return null;
+		}
+
+		try {
+			List<User> users = userService.getAllUsersWithRolAndPer(userRequest.getGroup_id());
+			writeJsonResponse(response, users);
+			return users;
+
+		} catch (RuntimeException e) {
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			return null;
+		}
+	}
+
 }

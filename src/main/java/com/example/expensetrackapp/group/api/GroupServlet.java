@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import javax.management.RuntimeErrorException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -50,24 +51,26 @@ public class GroupServlet extends BaseApiServlet {
 		PrintWriter out = response.getWriter();
 
 		String pathInfo = request.getPathInfo();
-		
+
 		String[] pathParts = pathInfo.split("/");
 		logger.info("pathinfo {}", pathInfo);
 		if (pathInfo.equals("/create")) {
 			logger.info("pathinfosdasdsad {}", pathInfo);
 			handleCreateGroup(request, response, out);
 		} else if (pathParts.length == 2) {
-			handleGetGroupById(pathInfo, response);
+			UUID id = UUID.fromString(pathParts[1]);
+			logger.info("gorupId {}", id);
+			handleUpdateGroupById(id, request, response, out);
 		}
 	}
 
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
-		
+
 		PrintWriter out = response.getWriter();
 		String pathInfo = request.getPathInfo();
-		
+
 		switch (pathInfo) {
 		case "/getAllGroup":
 			try {
@@ -76,9 +79,53 @@ public class GroupServlet extends BaseApiServlet {
 				logger.error("Error in handleGetAllGroup", e);
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
 			}
-			
+		case "/getAllGroupUserId":
+			try {
+				handleGetAllGroupUserId(request, response, out);
+			} catch (Exception e) {
+				logger.error("Error in handleGetAllGroupUserId", e);
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+			}
 		}
-		
+
+	}
+
+//	@Override
+//	protected void doPut(HttpServletRequest request, HttpServletResponse response)
+//			throws ServletException, IOException {
+//		PrintWriter out = response.getWriter();
+//		String pathInfo = request.getPathInfo();
+//
+//	}
+
+	@Override
+	protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+
+		PrintWriter out = response.getWriter();
+		String pathInfo = request.getPathInfo();
+
+		if (pathInfo == null || pathInfo.equals("/")) {
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Path info missing");
+			return;
+		}
+
+		String[] pathParts = pathInfo.split("/");
+		if (pathParts.length >= 2) {
+			try {
+				UUID groupId = UUID.fromString(pathParts[1]);
+
+				handleRomoveGroup(groupId, response, out);
+			} catch (NumberFormatException e) {
+				response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid group ID format");
+			} catch (Exception e) {
+				logger.error("Error deleting group", e);
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+			}
+		} else {
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Group ID not provided");
+		}
+
 	}
 
 	public void handleCreateGroup(HttpServletRequest request, HttpServletResponse response, PrintWriter out)
@@ -91,12 +138,10 @@ public class GroupServlet extends BaseApiServlet {
 			String token = authHeader.substring(7);
 			user_id = JwtUtil.extractUserId(token);
 		}
-		
-		logger.info("user_id {}", user_id);
-		
+
 		if (user_id == null) {
-		    sendErrorResponse(response, 401, "{\"success\": false, \"message\": \"Unauthorized: Invalid token.\"}");
-		    return;
+			sendErrorResponse(response, 401, "{\"success\": false, \"message\": \"Unauthorized: Invalid token.\"}");
+			return;
 		}
 
 		groupRequest = objectMapper.readValue(request.getReader(), GroupRequest.class);
@@ -105,13 +150,14 @@ public class GroupServlet extends BaseApiServlet {
 			sendErrorResponse(response, 400, "{\"success\": false, \"message\": \"Info group are required.\"}");
 			return;
 		}
-		
+
 		try {
 			if (groupService.createGroupService(groupRequest.getGroup_name(), user_id)) {
-				response.setStatus(HttpServletResponse.SC_OK); 
+				response.setStatus(HttpServletResponse.SC_OK);
 				out.print("{\"success\": true, \"message\": \"Create group successfully.\"}");
-				logger.info("create group  successfully");
+				logger.info("create group successfully");
 			}
+
 		} catch (SQLException e) {
 			logger.warn("Faild to create group");
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -122,30 +168,106 @@ public class GroupServlet extends BaseApiServlet {
 	public void handleGetGroupById(String pathInfo, HttpServletResponse response) throws IOException {
 
 	}
-	
+
+	public List<Group> handleGetAllGroupUserId(HttpServletRequest request, HttpServletResponse response,
+			PrintWriter out) throws IOException {
+
+		List<Group> groups = new ArrayList<>();
+
+		String user_id = null;
+		String authHeader = request.getHeader("Authorization");
+
+		try {
+			if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+				out.print("{\"error\": \"Missing or invalid Authorization header\"}");
+				return groups;
+			}
+
+			String token = authHeader.substring(7);
+
+			user_id = JwtUtil.extractUserId(token);
+
+			logger.info("userid {}", user_id);
+
+			groups = groupService.getAllGroupUserIdService(UUID.fromString(user_id));
+			writeJsonResponse(response, groups);
+		} catch (RuntimeException e) {
+			logger.warn("JWT error: {}", e.getMessage());
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+			out.print("{\"error\": \"" + e.getMessage() + "\"}");
+			return groups;
+		}
+
+		return groups;
+	}
+
 	public void handleGetUserInGroup(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		
+
 		UUID user_id = null;
-		
+
 		String authHeader = request.getHeader("Authorization");
 		if (authHeader != null && authHeader.startsWith("Bearer ")) {
 			String token = authHeader.substring(7);
-			user_id = UUID.fromString(JwtUtil.extractUserId(token)) ;
+			user_id = UUID.fromString(JwtUtil.extractUserId(token));
 		}
 	}
-	
-	public List<Group> handleGetAllGroup(HttpServletRequest request, HttpServletResponse response, PrintWriter out) throws IOException {
 
-	    List<Group> groups = new ArrayList<>();
-	    try {
-	        groups = groupService.getAllGroupService();
-	        writeJsonResponse(response, groups);
-	    } catch (RuntimeException e) {
-	        logger.error("Error when handle get all group role", e);
-	        out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
-	        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-	    }
+	public List<Group> handleGetAllGroup(HttpServletRequest request, HttpServletResponse response, PrintWriter out)
+			throws IOException {
 
-	    return groups;
+		List<Group> groups = new ArrayList<>();
+		try {
+			groups = groupService.getAllGroupService();
+			writeJsonResponse(response, groups);
+		} catch (RuntimeException e) {
+			logger.error("Error when handle get all group role", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+
+		return groups;
+	}
+
+	/**
+	 * 
+	 * @param request
+	 * @param response
+	 * @param out
+	 * @throws IOException
+	 */
+	public void handleRomoveGroup(UUID groupId, HttpServletResponse response, PrintWriter out) throws IOException {
+
+		try {
+			groupService.removeGroupById(groupId);
+			response.setStatus(HttpServletResponse.SC_OK);
+			out.print("{\"success\": true, \"message\": \"Delete group successfully.\"}");
+			logger.info("Delete group  successfully");
+		} catch (RuntimeException e) {
+			logger.error("Error when handle remove group role", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	public void handleUpdateGroupById(UUID id, HttpServletRequest request, HttpServletResponse response,
+			PrintWriter out) throws IOException {
+		try {
+			groupRequest = objectMapper.readValue(request.getReader(), GroupRequest.class);
+			if (groupRequest.getGroup_name() == null) {
+				out.print("{\"success\": false, \"message\": \"Data is missing required.\"}");
+				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				return;
+			}
+
+			groupService.updateGroupNameService(groupRequest.getGroup_name(), id);
+			response.setStatus(HttpServletResponse.SC_OK);
+			out.print("{\"success\": true, \"message\": \"Update group successfully.\"}");
+			logger.info("Update group  successfully");
+		} catch (RuntimeException e) {
+			logger.error("Error when handle Update group role", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
 	}
 }

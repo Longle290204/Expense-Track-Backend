@@ -3,20 +3,31 @@ package com.example.expensetrackapp.auth.models;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 public class Role {
 	private String role_id;
 	private String role_name;
 	private Set<Permission> permissions = new HashSet<>();
 	private Boolean is_system;
+	private UUID group_id;
 
 	public Role() {
 
 	}
-
-	public Role(String role_id, String role_name) {
+	
+	public Role(String role_id, String role_name, UUID group_id) {
 		this.role_id = role_id;
 		this.role_name = role_name;
+		this.group_id = group_id;
+	}
+
+	public UUID getGroup_id() {
+		return group_id;
+	}
+
+	public void setGroup_id(UUID group_id) {
+		this.group_id = group_id;
 	}
 
 	public String getRoleId() {
@@ -43,7 +54,6 @@ public class Role {
 		this.permissions = permissions;
 	}
 
-	
 	@Override
 	public int hashCode() {
 		return Objects.hash(role_id);
@@ -65,11 +75,11 @@ public class Role {
 	public String toString() {
 		return "Role{" + "role_id=" + role_id + ", role_name='" + role_name + '\'' + '}';
 	}
-	
+
 	public Boolean getIsSystemRole() {
 		return is_system;
 	}
-	
+
 	public void setIsSystemRole(Boolean is_system) {
 		this.is_system = is_system;
 	}

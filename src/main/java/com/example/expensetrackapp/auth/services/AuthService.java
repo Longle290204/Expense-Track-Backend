@@ -7,6 +7,7 @@ import com.example.expensetrackapp.auth.models.User;
 
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import javax.servlet.http.Cookie;
@@ -23,11 +24,13 @@ public class AuthService {
 	private UserDAO userDao;
 	private FieldExistDAO fieldExistDao;
 	private JwtService jwtService;
+	private RefreshTokenDAO refreshTokenDao;
 
 	public AuthService() {
 		this.userDao = new UserDAO();
 		this.jwtService = new JwtService();
 		this.fieldExistDao = new FieldExistDAO();
+		this.refreshTokenDao = new RefreshTokenDAO();
 	}
 
 	public boolean registerUser(String username, String password, String email, String confirmPassword) {
@@ -42,30 +45,30 @@ public class AuthService {
 			logger.warn("Registation failed: Email '{}' already exists", email);
 			return false;
 		}
-		
+
 		logger.info("logger confirmPassword '{}'", confirmPassword);
 		logger.info("logger Password '{}'", password);
 		if (confirmPassword != null && confirmPassword.equals(password)) {
 			// Hash password by bcrypt
 			String salt = BCrypt.gensalt();
 			String hashPassword = BCrypt.hashpw(password, salt);
-			
+
 			User newUser = new User();
 			newUser.setUsername(username);
 			newUser.setPassword(hashPassword);
 			newUser.setEmail(email);
-			
+
 			boolean success = userDao.createUser(newUser);
-			
+
 			if (success) {
 				logger.info("User '{}' registerd successfully", username);
 			} else {
 				logger.error("Fail creating account");
 			}
-			
+
 			return success;
 		}
-		
+
 		return false;
 	}
 
@@ -74,31 +77,32 @@ public class AuthService {
 
 		User userExist = userDao.getUsersByUsername(username);
 		if (userExist == null) {
-			logger.warn("Login failed: Username '{}' not registerd", username);
+			logger.warn("Login failed: Username '{}' not registered", username);
+			return null;
 		}
-		// Get user_id from user object
-		String user_id = userExist.getUser_id();		
 
-		// Compare password hashed
-		if ((BCrypt.checkpw(password, userExist.getPassword()))) {
-			logger.info("User '{}' login successfully");
+		String user_id = userExist.getUser_id();
 
-			long expiresAtLong = JwtService.EXPIRATION_TIME_REFRESH;
-			Timestamp expiresAt = new Timestamp(expiresAtLong);
+		if (BCrypt.checkpw(password, userExist.getPassword())) {
+			logger.info("User '{}' login successfully", username);
 
-			
+			// 1) expiresAt đúng:
+			// Cách 1:
+			LocalDateTime expiresAt = LocalDateTime.now().plusDays(5);
+			// Hoặc cách 2 nếu bạn vẫn muốn dùng hằng số millis:
+			// LocalDateTime expiresAt = Instant.now()
+			// .plusMillis(JwtService.EXPIRATION_TIME_REFRESH)
+			// .atZone(ZoneId.systemDefault())
+			// .toLocalDateTime();
+			logger.info("[LOGIN] save refreshToken with expiresAt={}", expiresAt);
 			String accessToken = jwtService.generateAccessToken(user_id, username);
-			String refreshToken = jwtService.generateRefreshToken(username, accessToken);
-			
-			
+			String refreshToken = jwtService.generateRefreshToken(user_id, accessToken);
 
-			// Update refresh token table
-			String userIdStr = userExist.getUser_id(); // trả về String
-			UUID userId = UUID.fromString(userIdStr);
+			UUID userId = UUID.fromString(user_id);
 			try {
-				RefreshTokenDAO.saveRefreshToken(userId, refreshToken, userAgent, ipAddress, expiresAt);
+				refreshTokenDao.saveRefreshToken(userId, refreshToken, expiresAt);
 			} catch (SQLException e) {
-				logger.error("Fail to save refresh token table", e);
+				logger.error("Fail to save refresh token", e);
 			}
 
 			return new String[] { accessToken, refreshToken };

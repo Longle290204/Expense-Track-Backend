@@ -1,6 +1,7 @@
 package com.example.expensetrackapp.auth.services;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -19,9 +20,9 @@ public class UserService extends BaseApiServlet {
 		userDao = new UserDAO();
 	}
 
-	public void addUserToGroupService(UUID group_id, UUID user_id) {
+	public void addUserToGroupService(UUID group_id, String email) {
 		try {
-			boolean isAddSuccess = userDao.addUserToGroupDao(group_id, user_id);
+			boolean isAddSuccess = userDao.addUserToGroupDao(group_id, email);
 
 			if (!isAddSuccess) {
 				throw new RuntimeException("Can't add user to group cause logic code");
@@ -55,4 +56,18 @@ public class UserService extends BaseApiServlet {
 			throw new RuntimeException("System error when add user.");
 		}
 	}
+	
+	
+	public List<User> getAllUsersWithRolAndPer(UUID group_id) {
+	    try {
+	        List<User> users = userDao.getAllUsersWithRolAndPer(group_id);
+	        
+	        logger.info("Returned users with roles and permissions: {}", users);
+	        return users;
+	    } catch (SQLException e) {
+	        logger.error("Error when getting user roles and permissions for group {}", group_id, e);
+	        throw new RuntimeException("System error when getting users.");
+	    }
+	}
+
 }

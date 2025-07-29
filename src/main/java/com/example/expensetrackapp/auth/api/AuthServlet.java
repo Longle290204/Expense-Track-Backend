@@ -5,13 +5,14 @@ import java.io.IOException;
 
 import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -129,6 +130,29 @@ public class AuthServlet extends BaseApiServlet {
 			String accessToken = tokens[0];
 			String refreshToken = tokens[1];
 
+			String csrfToken = UUID.randomUUID().toString();
+
+			// Lưu access token bằng HttpOnly Cookie
+			Cookie accessCookie = new Cookie("accessToken", accessToken);
+			accessCookie.setHttpOnly(true);
+			accessCookie.setSecure(true);
+			accessCookie.setPath("/");
+			accessCookie.setMaxAge(3600);
+
+			String accessTokenHeader = String
+					.format("accessToken=%s; Max-Age=3600; Path=/; HttpOnly; Secure; SameSite=Strict", accessToken);
+			response.addHeader("Set-Cookie", accessTokenHeader);
+
+			// Gửi cookie bằng header tùy chỉnh với SameSite
+			String cookieHeader = String.format("XSRF-TOKEN=%s; Max-Age=3600; Path=/; Secure; SameSite=Strict",
+					csrfToken);
+			response.addHeader("Set-Cookie", cookieHeader);
+			
+			// Có thể lưu csrfToken vào session hoặc cache để so sánh khi verify
+			request.getSession().setAttribute("CSRF_TOKEN", csrfToken);
+			
+			response.setContentType("application/json");
+	
 			if (tokens != null) {
 				LoginResponse loginResponse = new LoginResponse();
 				loginResponse.setUsername(username);
