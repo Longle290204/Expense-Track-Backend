@@ -49,25 +49,24 @@ public class UserService extends BaseApiServlet {
 			if (user == null) {
 				throw new RuntimeException("Can't get user with roles and permissions to group cause logic code");
 			}
-			
+
 			return user;
 		} catch (SQLException e) {
 			logger.error("Error when get user roles and permissions to group", e);
 			throw new RuntimeException("System error when add user.");
 		}
 	}
-	
-	
+
 	public List<User> getAllUsersWithRolAndPer(UUID group_id) {
-	    try {
-	        List<User> users = userDao.getAllUsersWithRolAndPer(group_id);
-	        
-	        logger.info("Returned users with roles and permissions: {}", users);
-	        return users;
-	    } catch (SQLException e) {
-	        logger.error("Error when getting user roles and permissions for group {}", group_id, e);
-	        throw new RuntimeException("System error when getting users.");
-	    }
+		try {
+			List<User> users = userDao.getAllUsersWithRolAndPer(group_id);
+
+			logger.info("Returned users with roles and permissions: {}", users);
+			return users;
+		} catch (SQLException e) {
+			logger.error("Error when getting user roles and permissions for group {}", group_id, e);
+			throw new RuntimeException("System error when getting users.");
+		}
 	}
 
 }

@@ -27,7 +27,13 @@ public class RoleDAO {
 	 * Tạo một vai trò mới trong DB.
 	 */
 	public Role addRoleInGroup(String role_name, UUID group_id, Boolean is_system) throws SQLException {
-		String sql = "INSERT INTO Roles (role_name, group_id, is_system) VALUES (?, ?, ?)";
+
+		if (checkIfExistName(role_name, group_id)) {
+			throw new RuntimeException("Role name already exists in this group or as a system role.");
+		}
+		
+
+		String sql = "INSERT INTO roles (role_name, group_id, is_system) VALUES (?, ?, ?)";
 
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -57,6 +63,25 @@ public class RoleDAO {
 		return null;
 	}
 
+	public boolean checkIfExistName(String role_name, UUID group_id) throws SQLException {
+
+		String sql = "SELECT role_name FROM roles WHERE role_name = ? AND (is_system = true OR group_id = ?)";
+
+		try (Connection connect = DBConnection.getConnection();
+				PreparedStatement pstmt = connect.prepareStatement(sql)) {
+
+			pstmt.setString(1, role_name);
+			pstmt.setObject(2, group_id);
+
+			ResultSet rs = pstmt.executeQuery();
+			if (rs.next()) {
+				return true;
+			}
+			
+		}
+		return false;
+	}
+
 	/**
 	 * 
 	 * Lấy tất cả các vai trò từ DB.
@@ -76,7 +101,7 @@ public class RoleDAO {
 				ResultSet rs = pstmt.executeQuery()) {
 
 			while (rs.next()) {
-				roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"), null));
+				roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"), null, null));
 			}
 		}
 		return roles;
@@ -89,22 +114,72 @@ public class RoleDAO {
 	 * @return
 	 * @throws SQLException
 	 */
-	public List<Role> getAllRolesInGroup(String group_id) throws SQLException {
+	public List<Role> getAllRolesInGroupDao(UUID group_id) throws SQLException {
+	    List<Role> roles = new ArrayList<>();
+
+	    String sql = "SELECT r.role_id, r.role_name, r.is_system, r.group_id, ur.user_id " +
+	                 "FROM roles r " +
+	                 "LEFT JOIN user_roles ur ON r.role_id = ur.role_id AND r.group_id = ur.group_id " +
+	                 "WHERE r.is_system = true OR r.group_id = ?::uuid";
+
+	    try (Connection connect = DBConnection.getConnection();
+	         PreparedStatement pstmt = connect.prepareStatement(sql)) {
+
+	        pstmt.setObject(1, group_id);
+
+	        try (ResultSet rs = pstmt.executeQuery()) {
+	            while (rs.next()) {
+	                String roleId = rs.getString("role_id");
+	                String roleName = rs.getString("role_name");
+	                boolean isSystem = rs.getBoolean("is_system");
+
+	                String groupIdStr = rs.getString("group_id");
+	                UUID groupId = groupIdStr != null ? UUID.fromString(groupIdStr) : null;
+
+	                UUID userId = rs.getObject("user_id") != null
+	                        ? UUID.fromString(rs.getString("user_id"))
+	                        : null;
+
+	                Role role = new Role(roleId, roleName, groupId, isSystem);
+	                role.setUserId(userId); // Nếu bạn có setter
+
+	                // Lấy danh sách permission
+	                List<Permission> permissions = getPermissionFromRoleInGroup(UUID.fromString(roleId), groupId);
+	                role.setPermissions(new HashSet<>(permissions));
+
+	                roles.add(role);
+	            }
+	        }
+	    }
+
+	    return roles;
+	}
+
+
+
+		
+	
+
+	/**
+	 * 
+	 * @return
+	 * @throws SQLException
+	 */
+	public List<Role> getAllRoleSystemDao() throws SQLException {
 		List<Role> roles = new ArrayList<>();
 
-		String sql = "SELECT role_id, role_name, group_id FROM roles WHERE group_id = ? ORDER BY role_name";
+		String sql = "SELECT role_id, role_name, is_system FROM roles WHERE group_id IS NULL AND is_system = true";
 
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql);) {
-			pstmt.setString(1, group_id);
+
 			try (ResultSet rs = pstmt.executeQuery()) {
 
 				while (rs.next()) {
-					roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"),
-							UUID.fromString(rs.getString("group_id"))));
+					roles.add(new Role(rs.getString("role_id"), rs.getString("role_name"), null,
+							rs.getBoolean("is_system")));
 				}
 			}
-
 		}
 		return roles;
 	}
@@ -123,7 +198,8 @@ public class RoleDAO {
 			logger.warn("Role with ID {} and group ID {} not found", role_id, group_id);
 		}
 
-		String sql = "SELECT r.role_id, r.role_name, r.group_id p.permission_id, p.permission_name " + "FROM roles r "
+		String sql = "SELECT r.role_id, r.role_name, r.group_id, r.is_system, p.permission_id, p.permission_name "
+				+ "FROM roles r "
 				+ "LEFT JOIN role_permissions rp ON r.role_id = rp.role_id AND r.group_id = rp.group_id"
 				+ "LEFT JOIN permissions p ON rp.permission_id = p.permission_id AND rp.group_id = p.group_id"
 				+ "WHERE r.role_id = ? AND group_id = ?";
@@ -138,7 +214,7 @@ public class RoleDAO {
 				while (rs.next()) {
 					if (role == null) {
 						role = new Role(rs.getString("role_id"), rs.getString("role_name"),
-								UUID.fromString(rs.getString("group_id")));
+								UUID.fromString(rs.getString("group_id")), rs.getBoolean("is_system"));
 					}
 					String permId = rs.getString("permission_id");
 					if (permId != null) {
@@ -180,6 +256,74 @@ public class RoleDAO {
 		}
 		return false;
 	}
+	
+	public void updatePermissionsForRole(UUID roleId, UUID groupId, List<UUID> newPermissionIds) throws SQLException {
+	    Connection connect = null;
+	    PreparedStatement pstmt = null;
+	    ResultSet rs = null;
+
+	    try {
+	        connect = DBConnection.getConnection();
+
+	        // 1. Lấy danh sách permission hiện tại từ DB
+	        String selectSQL = "SELECT permission_id FROM role_permissions WHERE role_id = ? AND group_id = ?";
+	        pstmt = connect.prepareStatement(selectSQL);
+	        pstmt.setObject(1, roleId);
+	        pstmt.setObject(2, groupId);
+	        rs = pstmt.executeQuery();
+
+	        Set<UUID> currentPermissionIds = new HashSet<>();
+	        while (rs.next()) {
+	            currentPermissionIds.add(UUID.fromString(rs.getString("permission_id")));
+	        }
+	        rs.close();
+	        pstmt.close();
+
+	        // 2. Tính phần cần xóa và thêm
+	        Set<UUID> newPermissionIdSet = new HashSet<>(newPermissionIds);
+
+	        Set<UUID> toDelete = new HashSet<>(currentPermissionIds);
+	        toDelete.removeAll(newPermissionIdSet);
+
+	        Set<UUID> toInsert = new HashSet<>(newPermissionIdSet);
+	        toInsert.removeAll(currentPermissionIds);
+
+	        // 3. Xóa permissions không còn tồn tại
+	        if (!toDelete.isEmpty()) {
+	            String deleteSQL = "DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ? AND group_id = ?";
+	            pstmt = connect.prepareStatement(deleteSQL);
+	            for (UUID permId : toDelete) {
+	                pstmt.setObject(1, roleId);
+	                pstmt.setObject(2, permId);
+	                pstmt.setObject(3, groupId);
+	                pstmt.addBatch();
+	            }
+	            pstmt.executeBatch();
+	            pstmt.close();
+	        }
+
+	        // 4. Thêm permissions mới
+	        if (!toInsert.isEmpty()) {
+	            String insertSQL = "INSERT INTO role_permissions (role_id, permission_id, group_id) VALUES (?, ?, ?)";
+	            pstmt = connect.prepareStatement(insertSQL);
+	            for (UUID permId : toInsert) {
+	                pstmt.setObject(1, roleId);
+	                pstmt.setObject(2, permId);
+	                pstmt.setObject(3, groupId);
+	                pstmt.addBatch();
+	            }
+	            pstmt.executeBatch();
+	            pstmt.close();
+	        }
+
+	    } finally {
+	        if (rs != null) rs.close();
+	        if (pstmt != null) pstmt.close();
+	        if (connect != null) connect.close();
+	    }
+	}
+
+
 
 	/**
 	 * Xóa vai trò trong group
@@ -190,16 +334,37 @@ public class RoleDAO {
 	 * 
 	 */
 	public boolean deleteRoleInGroup(UUID role_id, UUID group_id) throws SQLException {
-		String sql = "DELETE FROM roles WHERE role_id = ? AND group_id = ?";
+	    String deleteRolePermissionsSql = "DELETE FROM role_permissions WHERE role_id = ? AND group_id = ?";
+	    String deleteRoleSql = "DELETE FROM roles WHERE role_id = ? AND group_id = ?";
 
-		try (Connection connect = DBConnection.getConnection();
-				PreparedStatement pstmt = connect.prepareStatement(sql)) {
+	    try (Connection connect = DBConnection.getConnection()) {
+	        connect.setAutoCommit(false); // Bắt đầu transaction
 
-			pstmt.setObject(1, role_id);
-			pstmt.setObject(2, group_id);
-			return pstmt.executeUpdate() > 0;
-		}
+	        try (
+	            PreparedStatement deletePermissions = connect.prepareStatement(deleteRolePermissionsSql);
+	            PreparedStatement deleteRole = connect.prepareStatement(deleteRoleSql)
+	        ) {
+	            // Xóa permissions
+	            deletePermissions.setObject(1, role_id);
+	            deletePermissions.setObject(2, group_id);
+	            deletePermissions.executeUpdate();
+
+	            // Xóa role
+	            deleteRole.setObject(1, role_id);
+	            deleteRole.setObject(2, group_id);
+	            int affectedRows = deleteRole.executeUpdate();
+
+	            connect.commit(); // Xác nhận transaction
+	            return affectedRows > 0;
+	        } catch (Exception e) {
+	            connect.rollback(); // Quay lui nếu có lỗi
+	            throw e;
+	        } finally {
+	            connect.setAutoCommit(true);
+	        }
+	    }
 	}
+
 
 	/**
 	 * 
@@ -210,8 +375,7 @@ public class RoleDAO {
 	 * @throws SQLException
 	 * 
 	 */
-	public boolean addPermissionToRoleInGroup(UUID role_id, UUID group_id, List<UUID> permissionIds)
-			throws SQLException {
+	public boolean addPermissionToRoleInGroup(UUID roleId, UUID groupId, List<UUID> permissionIds) throws SQLException {
 		String sql = "INSERT INTO role_permissions (role_id, permission_id, group_id) VALUES (?, ?, ?)";
 
 		if (permissionIds == null || permissionIds.isEmpty()) {
@@ -220,21 +384,22 @@ public class RoleDAO {
 
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql)) {
+
 			for (UUID permissionId : permissionIds) {
-				pstmt.setObject(1, role_id);
+				pstmt.setObject(1, roleId);
 				pstmt.setObject(2, permissionId);
-				pstmt.setObject(3, group_id);
+				pstmt.setObject(3, groupId);
 				pstmt.addBatch();
 			}
+
 			pstmt.executeBatch();
 			return true;
 		} catch (SQLException e) {
 			logger.error("Failed to add permission to role in group", e);
+			throw e;
 		}
-
-		return false;
 	}
-
+	
 	/**
 	 * 
 	 * Remove permission from role within range group
@@ -284,21 +449,13 @@ public class RoleDAO {
 	 * @return set permission của role cụ thể
 	 * @throws SQLException
 	 */
-	public Set<Permission> getPermissionFromRoleInGroup(UUID role_id, UUID group_id) throws SQLException {
+	public List<Permission> getPermissionFromRoleInGroup(UUID role_id, UUID group_id) throws SQLException {
 
-		Set<Permission> permissions = new HashSet<>();
+		List<Permission> permissions = new ArrayList<>();
 
-		String sql;
-
-		if (group_id == null) {
-			sql = "SELECT p.permission_id, p.permission_name FROM permissions p "
-					+ "JOIN role_permissions rp ON rp.permission_id = p.permission_id "
-					+ "WHERE rp.role_id = ? AND rp.group_id IS NULL";
-		} else {
-			sql = "SELECT p.permission_id, p.permission_name FROM permissions p "
-					+ "JOIN role_permissions rp ON rp.permission_id = p.permission_id "
-					+ "WHERE rp.role_id = ? AND rp.group_id = ?";
-		}
+		String sql = "SELECT p.permission_id, p.permission_name " + "FROM permissions p "
+				+ "JOIN role_permissions rp ON p.permission_id = rp.permission_id "
+				+ "WHERE rp.role_id = ? AND (rp.group_id = ? OR rp.group_id IS NULL)";
 
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql)) {
@@ -306,6 +463,8 @@ public class RoleDAO {
 			pstmt.setObject(1, role_id);
 			if (group_id != null) {
 				pstmt.setObject(2, group_id);
+			} else {
+				pstmt.setNull(2, java.sql.Types.OTHER); // sửa chỗ này để không bị lỗi
 			}
 
 			try (ResultSet rs = pstmt.executeQuery()) {
@@ -388,7 +547,7 @@ public class RoleDAO {
 	 */
 	public boolean assignRolesToUserDao(UUID user_id, UUID group_id, UUID role_id) throws SQLException {
 
-		String sql = "INSERT INTO user_roles (user_id, role_id, group_id) VALUES (?, ?, ?)";
+		String sql = "UPDATE user_roles SET role_id = ? WHERE user_id = ? AND group_id = ?";
 		try (Connection connect = DBConnection.getConnection();
 				PreparedStatement pstmt = connect.prepareStatement(sql)) {
 
@@ -400,4 +559,5 @@ public class RoleDAO {
 			return rowUpdates > 0;
 		}
 	}
+
 }

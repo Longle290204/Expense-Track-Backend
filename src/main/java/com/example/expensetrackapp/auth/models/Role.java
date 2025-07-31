@@ -11,15 +11,18 @@ public class Role {
 	private Set<Permission> permissions = new HashSet<>();
 	private Boolean is_system;
 	private UUID group_id;
+	private UUID userId;
 
 	public Role() {
 
 	}
-	
-	public Role(String role_id, String role_name, UUID group_id) {
+
+	public Role(String role_id, String role_name, UUID group_id, Boolean is_system) {
 		this.role_id = role_id;
 		this.role_name = role_name;
 		this.group_id = group_id;
+		this.is_system = is_system;
+
 	}
 
 	public UUID getGroup_id() {
@@ -82,5 +85,13 @@ public class Role {
 
 	public void setIsSystemRole(Boolean is_system) {
 		this.is_system = is_system;
+	}
+
+	public void setUserId(UUID userId) {
+		this.userId = userId;
+	}
+
+	public UUID getUserId() {
+		return userId;
 	}
 }

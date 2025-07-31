@@ -3,7 +3,9 @@ package com.example.expensetrackapp.auth.api;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.example.expensetrackapp.api.BaseApiServlet;
 import com.example.expensetrackapp.auth.dao.RoleDAO;
 import com.example.expensetrackapp.auth.models.Permission;
+import com.example.expensetrackapp.auth.models.Role;
 import com.example.expensetrackapp.auth.models.RoleRequest;
 import com.example.expensetrackapp.auth.services.RoleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,7 +45,6 @@ public class RoleApiServlet extends BaseApiServlet {
 		PrintWriter out = response.getWriter();
 
 		String pathInfo = request.getPathInfo();
-		String[] pathParts = pathInfo.split("/");
 
 		switch (pathInfo) {
 		case "/addRoleInGroup":
@@ -69,6 +71,14 @@ public class RoleApiServlet extends BaseApiServlet {
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
 			}
 			break;
+		case "/updatePermissionForRole":
+			try {
+				handleUpdatePermissionForRole(request, response, out);
+			} catch (Exception e) {
+				logger.error("Error in handleUpdatePermissionForRole", e);
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+			}
+			break;
 		default:
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Route not found in POST");
 			break;
@@ -83,18 +93,36 @@ public class RoleApiServlet extends BaseApiServlet {
 
 		String pathInfo = request.getPathInfo();
 
-		switch (pathInfo) {
-		case "/getPermissionFromRole":
-			try {
-				handleGetPermissionFromRoleInGroup(request, response, out);
-			} catch (Exception e) {
-				logger.error("Error in handleGetPermissionFromRoleInGroup", e);
-				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+		if (pathInfo != null) {
+			String[] pathPart = pathInfo.split("/");
+
+			// pathPart[0] = "", pathPart[1] = "handleGetAllRolesInGroup", pathPart[2] =
+			// group_id
+			if (pathPart.length >= 3 && "getAllRolesInGroup".equals(pathPart[1])) {
+				handleGetAllRoleInGroup(response, out, (UUID.fromString(pathPart[2])));
+				return;
 			}
-			break;
-		default:
+
+			switch (pathInfo) {
+			case "/getPermissionFromRole":
+				try {
+					handleGetPermissionFromRoleInGroup(request, response, out);
+				} catch (Exception e) {
+					logger.error("Error in handleGetPermissionFromRoleInGroup", e);
+					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+				}
+				break;
+			case "/getAllRolesSystem":
+				try {
+					handleGetAllRoleSystem(response, out);
+				} catch (Exception e) {
+					logger.error("Error in handleGetAllRoleSystem", e);
+					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+				}
+				break;
+			}
+
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Route not found in GET");
-			break;
 		}
 	}
 
@@ -155,9 +183,13 @@ public class RoleApiServlet extends BaseApiServlet {
 			return false;
 		}
 
-		roleService.addRoleInGroupService(roleRequest.getRole_name(), roleRequest.getGroup_id(),
-				roleRequest.getIs_system());
-		out.print("{\"success\": true, \"message\": \"Role has been added to the group.\"}");
+		try {
+			roleService.addRoleInGroupService(roleRequest.getRole_name(), roleRequest.getGroup_id(),
+					roleRequest.getIs_system());
+			out.print("{\"success\": true, \"message\": \"Role has been added to the group.\"}");
+		} catch (RuntimeException e) {
+			response.setStatus(HttpServletResponse.SC_CONFLICT);
+		}
 
 		return false;
 	}
@@ -263,7 +295,7 @@ public class RoleApiServlet extends BaseApiServlet {
 		}
 
 		try {
-			Set<Permission> permission = roleService.getPermissionFromRoleInGroupService(roleRequest.getRole_id(),
+			List<Permission> permission = roleService.getPermissionFromRoleInGroupService(roleRequest.getRole_id(),
 					roleRequest.getGroup_id());
 			writeJsonResponse(response, permission);
 		} catch (RuntimeException e) {
@@ -289,6 +321,63 @@ public class RoleApiServlet extends BaseApiServlet {
 			out.print("{\"success\": false, \"message\": \"Role_id and group_id are required.\"}");
 		} catch (RuntimeException e) {
 			logger.error("Error when handle get permission from role", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	public void handleGetAllRoleInGroup(HttpServletResponse response, PrintWriter out, UUID group_id)
+			throws IOException {
+
+		if (group_id == null) {
+			out.print("{\"success\": false, \"message\": \"Enter missing field.\"}");
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			return;
+		}
+
+		List<Role> roles = null;
+
+		try {
+
+			roles = roleService.getAllRoleInGroupService(group_id);
+
+			writeJsonResponse(response, roles);
+		} catch (RuntimeException e) {
+			logger.error("Error when handle get all roles", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	public void handleGetAllRoleSystem(HttpServletResponse response, PrintWriter out) throws IOException {
+
+		List<Role> roles = null;
+
+		try {
+			roles = roleService.getAllRoleSystemService();
+			writeJsonResponse(response, roles);
+		} catch (RuntimeException e) {
+			logger.error("Error when handle get all roles system", e);
+			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	public void handleUpdatePermissionForRole(HttpServletRequest request, HttpServletResponse response, PrintWriter out)
+			throws IOException {
+
+		RoleRequest roleRequest = objectMapper.readValue(request.getReader(), RoleRequest.class);
+		if (roleRequest.getRole_id() == null || roleRequest.getGroup_id() == null
+				|| roleRequest.getPermissionIds() == null) {
+			out.print("{\"success\": false, \"message\": \"Enter missing field.\"}");
+			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+			return;
+		}
+
+		try {
+			roleService.updatePermissionForRol(roleRequest.getRole_id(), roleRequest.getGroup_id() , roleRequest.getPermissionIds());
+		} catch (RuntimeException e) {
+			logger.error("Error when handle get all roles", e);
 			out.print("{\"success\": false, \"message\": \"" + e.getMessage() + "\"}");
 			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 		}

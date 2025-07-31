@@ -52,14 +52,7 @@ public class UserApiServlet extends BaseApiServlet {
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
 			}
 			break;
-		case "/getAllUserWithRolesAndPermission":
-			try {
-				handleGetAllUserWithRolesAndPermission(request, response, out);
-			} catch (Exception e) {
-				logger.error("Error in handleGetAllUserWithRolesAndPermission", e);
-				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
-			}
-			break;
+
 		default:
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Route not found in POST");
 			break;
@@ -79,6 +72,14 @@ public class UserApiServlet extends BaseApiServlet {
 				handleAddUserToGroup(request, response, out);
 			} catch (Exception e) {
 				logger.error("Error in handleAddRoleInGroup", e);
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
+			}
+			break;
+		case "/getAllUserWithRolesAndPermission":
+			try {
+				handleGetAllUserWithRolesAndPermission(request, response, out);
+			} catch (Exception e) {
+				logger.error("Error in handleGetAllUserWithRolesAndPermission", e);
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Server error");
 			}
 			break;

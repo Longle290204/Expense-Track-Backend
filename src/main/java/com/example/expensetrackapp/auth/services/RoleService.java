@@ -52,7 +52,17 @@ public class RoleService {
 			logger.error("Failed to creating role");
 			return false;
 		}
+	}
+	
+	public void updatePermissionForRol(UUID roleId, UUID groupId, List<UUID> newPermissionIds) {
+			try {
+				roleDao.updatePermissionsForRole(roleId, groupId, newPermissionIds);
+				logger.info("update permission successfully!");
+			} catch (SQLException e) {
+				logger.error("Error when update permission", e);
 
+				throw new RuntimeException("System error when deleting role.");
+			}
 	}
 
 	/**
@@ -117,13 +127,13 @@ public class RoleService {
 		} catch (SQLException e) {
 			logger.error("Error when add permission to role in group", e);
 
-			throw new RuntimeException("System error when update role.");
+			throw new RuntimeException("System error when add permission to role.");
 		}
 	}
 
-	public Set<Permission> getPermissionFromRoleInGroupService(UUID role_id, UUID group_id) {
+	public List<Permission> getPermissionFromRoleInGroupService(UUID role_id, UUID group_id) {
 		try {
-			Set<Permission> permissions = roleDao.getPermissionFromRoleInGroup(role_id, group_id);
+			List<Permission> permissions = roleDao.getPermissionFromRoleInGroup(role_id, group_id);
 
 			if (permissions.isEmpty()) {
 				throw new RuntimeException("Can't get permissions from role");
@@ -158,5 +168,38 @@ public class RoleService {
 
 			throw new RuntimeException("System error when  assign role to user.");
 		}
+	}
+
+	public List<Role> getAllRoleInGroupService(UUID group_id) {
+
+		if (group_id == null) {
+			logger.error("Error missing group_id)");
+			throw new IllegalArgumentException("group_id is required");
+		}
+
+		List<Role> roles = null;
+		try {
+			roles = roleDao.getAllRolesInGroupDao(group_id);
+
+		} catch (SQLException e) {
+			logger.error("Error when  get all role in group", e);
+
+			throw new RuntimeException("System error when get all roles.");
+		}
+		return roles;
+	}
+
+	public List<Role> getAllRoleSystemService() {
+
+		List<Role> roles = null;
+		try {
+			roles = roleDao.getAllRoleSystemDao();
+
+		} catch (SQLException e) {
+			logger.error("Error when  get all role system", e);
+
+			throw new RuntimeException("System error when get all roles system.");
+		}
+		return roles;
 	}
 }

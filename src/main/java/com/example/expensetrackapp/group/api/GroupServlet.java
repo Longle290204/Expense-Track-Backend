@@ -129,41 +129,46 @@ public class GroupServlet extends BaseApiServlet {
 	}
 
 	public void handleCreateGroup(HttpServletRequest request, HttpServletResponse response, PrintWriter out)
-			throws IOException {
+	        throws IOException {
 
-		String user_id = null;
+	    String user_id = null;
 
-		String authHeader = request.getHeader("Authorization");
-		if (authHeader != null && authHeader.startsWith("Bearer ")) {
-			String token = authHeader.substring(7);
-			user_id = JwtUtil.extractUserId(token);
-		}
+	    String authHeader = request.getHeader("Authorization");
+	    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+	        String token = authHeader.substring(7);
+	        user_id = JwtUtil.extractUserId(token);
+	    }
 
-		if (user_id == null) {
-			sendErrorResponse(response, 401, "{\"success\": false, \"message\": \"Unauthorized: Invalid token.\"}");
-			return;
-		}
+	    if (user_id == null) {
+	        sendErrorResponse(response, 401, "{\"success\": false, \"message\": \"Unauthorized: Invalid token.\"}");
+	        return;
+	    }
 
-		groupRequest = objectMapper.readValue(request.getReader(), GroupRequest.class);
+	    GroupRequest groupRequest = objectMapper.readValue(request.getReader(), GroupRequest.class);
 
-		if (groupRequest.getGroup_name() == null) {
-			sendErrorResponse(response, 400, "{\"success\": false, \"message\": \"Info group are required.\"}");
-			return;
-		}
+	    if (groupRequest.getGroup_name() == null || groupRequest.getGroup_name().trim().isEmpty()) {
+	        sendErrorResponse(response, 400, "{\"success\": false, \"message\": \"Group name is required.\"}");
+	        return;
+	    }
 
-		try {
-			if (groupService.createGroupService(groupRequest.getGroup_name(), user_id)) {
-				response.setStatus(HttpServletResponse.SC_OK);
-				out.print("{\"success\": true, \"message\": \"Create group successfully.\"}");
-				logger.info("create group successfully");
-			}
+	    try {
+	        UUID groupId = groupService.createGroupService(groupRequest.getGroup_name(), user_id);
 
-		} catch (SQLException e) {
-			logger.warn("Faild to create group");
-			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-			out.print("{\"success\": false, \"message\": \"An error occurred creating group.\"}");
-		}
+	        if (groupId != null) {
+	            response.setStatus(HttpServletResponse.SC_OK);
+	            out.print("{\"success\": true, \"message\": \"Create group successfully.\", \"group_id\": \"" + groupId + "\"}");
+	            logger.info("Create group successfully with ID: {}", groupId);
+	        } else {
+	            response.setStatus(HttpServletResponse.SC_CONFLICT);
+	            out.print("{\"success\": false, \"message\": \"Group already exists.\"}");
+	        }
+	    } catch (SQLException e) {
+	        logger.error("Failed to create group", e);
+	        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+	        out.print("{\"success\": false, \"message\": \"An error occurred creating group.\"}");
+	    }
 	}
+
 
 	public void handleGetGroupById(String pathInfo, HttpServletResponse response) throws IOException {
 

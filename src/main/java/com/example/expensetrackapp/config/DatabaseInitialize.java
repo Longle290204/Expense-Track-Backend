@@ -50,7 +50,8 @@ public class DatabaseInitialize implements ServletContextListener {
 
 			String createTableUserGroupCmd = "CREATE TABLE IF NOT EXISTS user_groups (" + "group_id UUID NOT NULL, "
 					+ "user_id UUID NOT NULL, " + "joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-					+ "PRIMARY KEY (group_id, user_id), " + "FOREIGN KEY (user_id) REFERENCES users(user_id), "
+					+ "email VARCHAR(50) NOT NULL, " + "PRIMARY KEY (group_id, user_id), "
+					+ "FOREIGN KEY (user_id) REFERENCES users(user_id), "
 					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
 			pstmt = connect.prepareStatement(createTableUserGroupCmd);
 			pstmt.executeUpdate();
@@ -145,10 +146,9 @@ public class DatabaseInitialize implements ServletContextListener {
 			// SQL role_permisstions table
 			String createRolePermissionTableCmd = "CREATE TABLE IF NOT EXISTS role_permissions ("
 					+ "role_id UUID NOT NULL, " + "permission_id UUID NOT NULL, " + "group_id UUID, "
-					+ "PRIMARY KEY (role_id, permission_id, group_id),"
+					+ "PRIMARY KEY (role_id, permission_id),"
 					+ "FOREIGN KEY (role_id) REFERENCES roles(role_id),"
-					+ "FOREIGN KEY (permission_id) REFERENCES permissions(permission_id), "
-					+ "FOREIGN KEY (group_id) REFERENCES groups(group_id)" + ")";
+					+ "FOREIGN KEY (permission_id) REFERENCES permissions(permission_id)" + ")";
 			pstmt = connect.prepareStatement(createRolePermissionTableCmd);
 			pstmt.executeUpdate();
 			pstmt.close();

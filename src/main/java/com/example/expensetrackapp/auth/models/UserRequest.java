@@ -8,6 +8,7 @@ public class UserRequest {
 	private UUID group_id;
 	private UUID user_id;
 	private String role_name;
+	private UUID role_id;
 	
 	public UserRequest() {
 		

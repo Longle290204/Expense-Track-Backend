@@ -22,23 +22,59 @@ public class GroupDAO {
 	private static final Logger logger = LoggerFactory.getLogger(GroupDAO.class);
 
 	public UUID createGroupDao(String group_name, String user_id) throws SQLException {
-		logger.info("group_name: {}, user_id: {}", group_name, user_id);
-		String sql = "INSERT INTO groups (group_name, created_by) VALUES (?, ?::uuid) RETURNING group_id";
+		String createGroupSQL = "INSERT INTO groups (group_name, created_by) VALUES (?, ?::uuid) RETURNING group_id";
+		String getOwnerRoleSQL = "SELECT role_id FROM roles WHERE role_name = 'OWNER'";
+		String assignUserRoleSQL = "INSERT INTO user_roles (user_id, group_id, role_id) VALUES (?::uuid, ?, ?)";
+		String addUserToGroupSQL = "INSERT INTO user_groups (group_id, user_id) VALUES (?::uuid, ?::uuid)";
 
-		try (Connection connect = DBConnection.getConnection();
-				PreparedStatement pstmt = connect.prepareStatement(sql)) {
+		try (Connection connect = DBConnection.getConnection()) {
+			connect.setAutoCommit(false);
 
-			pstmt.setString(1, group_name);
-			pstmt.setString(2, user_id);
+			UUID groupId;
+			UUID ownerRoleId;
 
-			try (ResultSet rs = pstmt.executeQuery()) {
-				if (rs.next()) {
-					UUID groupId = (UUID) rs.getObject("group_id");
-					logger.info("Created group with group_id={}", groupId);
-					return groupId;
-				} else {
-					throw new SQLException("Failed to create group, no ID returned.");
+			try (PreparedStatement pstmtGroup = connect.prepareStatement(createGroupSQL);
+					PreparedStatement pstmtGetRole = connect.prepareStatement(getOwnerRoleSQL);
+					PreparedStatement pstmtAssignRole = connect.prepareStatement(assignUserRoleSQL);
+					PreparedStatement pstmtAddUserToGroup = connect.prepareStatement(addUserToGroupSQL);) {
+				// 1. Tạo group
+				pstmtGroup.setString(1, group_name);
+				pstmtGroup.setString(2, user_id);
+
+				try (ResultSet rs = pstmtGroup.executeQuery()) {
+					if (rs.next()) {
+						groupId = (UUID) rs.getObject("group_id");
+					} else {
+						throw new SQLException("Tạo group thất bại.");
+					}
 				}
+
+				// 2. Lấy role_id của role OWNER
+				try (ResultSet rsRole = pstmtGetRole.executeQuery()) {
+					if (rsRole.next()) {
+						ownerRoleId = (UUID) rsRole.getObject("role_id");
+					} else {
+						throw new SQLException("Không tìm thấy role 'owner'.");
+					}
+				}
+
+				// 3. Gán role OWNER cho user
+				pstmtAssignRole.setString(1, user_id);
+				pstmtAssignRole.setObject(2, groupId);
+				pstmtAssignRole.setObject(3, ownerRoleId);
+				pstmtAssignRole.executeUpdate();
+
+				// 4. Thêm user vào bảng user_groups
+				pstmtAddUserToGroup.setObject(1, groupId);
+				pstmtAddUserToGroup.setString(2, user_id);
+				pstmtAddUserToGroup.executeUpdate();
+
+				connect.commit();
+				return groupId;
+
+			} catch (Exception e) {
+				connect.rollback();
+				throw e;
 			}
 		}
 	}
@@ -46,7 +82,7 @@ public class GroupDAO {
 	public int cloneSystemRolesToGroupDao(UUID targetGroupId) throws SQLException {
 
 		String sql = "INSERT INTO roles (role_id, group_id, role_name, is_system) "
-				+ "SELECT uuid_generate_v4(), ?, role_name, false FROM roles WHERE is_system = true";
+				+ "SELECT uuid_generate_v4(), ?, role_name, true FROM roles WHERE is_system = true";
 
 		try (Connection conn = DBConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -183,28 +219,64 @@ public class GroupDAO {
 	 * @return
 	 * @throws SQLException
 	 */
+//	public List<Group> getAllGroupUserIdDao(UUID user_id) throws SQLException {
+//		String sql = "SELECT g.group_id, g.group_name, g.created_by, g.created_at " + "FROM groups g "
+//				+ "WHERE g.created_by = ?";
+//
+//		List<Group> groups = new ArrayList<>();
+//
+//		try (Connection connect = DBConnection.getConnection();
+//				PreparedStatement pstmt = connect.prepareStatement(sql)) {
+//			pstmt.setObject(1, user_id);
+//
+//			ResultSet rs = pstmt.executeQuery();
+//
+//			while (rs.next()) {
+//				Group group = new Group(rs.getString("group_id"), rs.getString("group_name"));
+//				group.setCreatedBy(UUID.fromString(rs.getString("created_by")));
+//				group.setCreatedAt(rs.getTimestamp("created_at"));
+//
+//				groups.add(group);
+//			}
+//
+//		}
+//		return groups;
+//	}
+	
+	/**
+	 * 
+	 * @param user_id
+	 * @return   
+	 * @throws SQLException
+	 */
 	public List<Group> getAllGroupUserIdDao(UUID user_id) throws SQLException {
-		String sql = "SELECT g.group_id, g.group_name, g.created_by, g.created_at " + "FROM groups g "
-				+ "WHERE g.created_by = ?";
+		
+		String sql = "SELECT DISTINCT g.group_id, g.group_name, g.created_by, g.created_at " +
+	             "FROM groups g " +
+	             "JOIN user_groups ug ON g.group_id = ug.group_id " +
+	             "WHERE ug.user_id = ? OR g.created_by = ?";
 
-		List<Group> groups = new ArrayList<>();
+	    List<Group> groups = new ArrayList<>();
 
-		try (Connection connect = DBConnection.getConnection();
-				PreparedStatement pstmt = connect.prepareStatement(sql)) {
-			pstmt.setObject(1, user_id);
+	    try (Connection connect = DBConnection.getConnection();
+	         PreparedStatement pstmt = connect.prepareStatement(sql)) {
+	        pstmt.setObject(1, user_id);
+	        pstmt.setObject(2, user_id);
 
-			ResultSet rs = pstmt.executeQuery();
+	        ResultSet rs = pstmt.executeQuery();
 
-			while (rs.next()) {
-				Group group = new Group(rs.getString("group_id"), rs.getString("group_name"));
-				group.setCreatedBy(UUID.fromString(rs.getString("created_by")));
-				group.setCreatedAt(rs.getTimestamp("created_at"));
+	        while (rs.next()) {
+	            Group group = new Group(
+	                rs.getString("group_id"),
+	                rs.getString("group_name")
+	            );
+	            group.setCreatedBy(UUID.fromString(rs.getString("created_by")));
+	            group.setCreatedAt(rs.getTimestamp("created_at"));
+	            groups.add(group);
+	        }
+	    }
 
-				groups.add(group);
-			}
-
-		}
-		return groups;
+	    return groups;
 	}
 
 	public void updateGroupNameDao(String group_name, UUID group_id) throws SQLException {

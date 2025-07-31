@@ -38,22 +38,8 @@ public class GroupService {
 	 *                      group lookup or creation
 	 * 
 	 */
-	public boolean createGroupService(String group_name, String user_id) throws SQLException {
-		
-	    // Kiểm tra trùng tên nhóm (tuỳ yêu cầu logic)
-	    Group groupExist = groupDao.getGroupById(user_id);
-	    if (groupExist != null) {
-	        logger.warn("Create failed: Group already exists");
-	        return false;
-	    }
-
-	    // 1. Tạo nhóm và nhận group_id
-	    UUID newGroupId = groupDao.createGroupDao(group_name, user_id);
-	   
-	    // 2. Clone role hệ thống vào nhóm vừa tạo
-	   groupDao.cloneSystemRolesToGroupDao(newGroupId);
-
-	    return true;
+	public UUID createGroupService(String group_name, String user_id) throws SQLException {
+	    return groupDao.createGroupDao(group_name, user_id);
 	}
 	
 	public void cloneSystemRolesToGroupService(UUID groupId) {
@@ -62,13 +48,13 @@ public class GroupService {
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
-		
 	}
 
 	/**
 	 * 
 	 * @param user_id
 	 * @param group_id
+	 * 
 	 */
 	public void getUserInGroupService(UUID user_id, UUID group_id) {
 		try {

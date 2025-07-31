@@ -139,7 +139,7 @@ public class UserDAO {
 		User user = null;
 
 		String sql = "SELECT u.user_id, u.username, u.email, u.password, u.created_at, u.updated_at, "
-				+ "r.role_id, r.role_name, " + "p.permission_id, p.permission_name " + "FROM users u "
+				+ "r.role_id, r.role_name, r.is_system " + "p.permission_id, p.permission_name " + "FROM users u "
 				+ "LEFT JOIN user_roles ur ON u.user_id = ur.user_id "
 				+ "LEFT JOIN roles r ON ur.role_id = r.role_id AND r.group_id = ? "
 				+ "LEFT JOIN role_permissions rp ON r.role_id = rp.role_id "
@@ -167,7 +167,7 @@ public class UserDAO {
 					if (roleId != null) {
 						Role role = roleMap.get(roleId);
 						if (role == null) {
-							role = new Role(roleId, "ADMIN", null);
+							role = new Role(roleId, "ADMIN", null, null);
 							roleMap.put(roleId, role);
 							roles.add(role);
 						}
@@ -311,7 +311,7 @@ public class UserDAO {
 					String roleId = rs.getString("role_id");
 					String roleName = rs.getString("role_name");
 					if (roleId != null && roleName != null) {
-						roles.add(new Role(roleId, roleName, null));
+						roles.add(new Role(roleId, roleName, null, null));
 					}
 				}
 
@@ -401,14 +401,63 @@ public class UserDAO {
 	}
 
 	public boolean addUserToGroupDao(UUID group_id, String email) throws SQLException {
-		String sql = "INSERT INTO user_groups (group_id, email) VALUES (?, ?)";
-		try (Connection connect = DBConnection.getConnection();
-				PreparedStatement pstmt = connect.prepareStatement(sql)) {
-			pstmt.setObject(1, group_id);
-			pstmt.setString(2, email);
+		String getUserIdSQL = "SELECT user_id FROM users WHERE email = ?";
+		String addUserToGroupSQL = "INSERT INTO user_groups (group_id, user_id, email) VALUES (?, ?, ?)";
+		String getMemberRoleIdSQL = "SELECT role_id FROM roles WHERE role_name = 'MEMBER' AND group_id IS NULL";
+		String assignRoleToUserSQL = "INSERT INTO user_roles (user_id, role_id, group_id) VALUES (?, ?, ?)";
 
-			int rowUpdate = pstmt.executeUpdate();
-			return rowUpdate > 0;
+		try (Connection connect = DBConnection.getConnection()) {
+			// Transaction
+			connect.setAutoCommit(false);
+
+			try {
+				PreparedStatement psGetUserId = connect.prepareStatement(getUserIdSQL);
+				psGetUserId.setString(1, email);
+				ResultSet rx = psGetUserId.executeQuery();
+
+				UUID user_id = null;
+				if (rx.next()) {
+					user_id = (UUID) rx.getObject("user_id");
+				} else {
+					throw new SQLException("Không tìm thấy user_id");
+				}
+
+				// Thêm user vào group
+				PreparedStatement psAddUser = connect.prepareStatement(addUserToGroupSQL);
+				psAddUser.setObject(1, group_id);
+				psAddUser.setObject(2, user_id);
+				psAddUser.setString(3, email);
+				psAddUser.executeUpdate();
+
+				// Lấy role_id với role_name = MEMBER và group_id
+				PreparedStatement psGetRoleId = connect.prepareStatement(getMemberRoleIdSQL);
+				ResultSet rs = psGetRoleId.executeQuery();
+
+				UUID role_id = null;
+				if (rs.next()) {
+					role_id = (UUID) rs.getObject("role_id");
+				} else {
+					throw new SQLException("Không tìm thấy role 'MEMBER' cho group_id: " + group_id);
+				}
+
+				// 3. Gán role cho user
+				PreparedStatement psAssignRoleToUser = connect.prepareStatement(assignRoleToUserSQL);
+				psAssignRoleToUser.setObject(1, user_id);
+				psAssignRoleToUser.setObject(2, role_id);
+				psAssignRoleToUser.setObject(3, group_id);
+				psAssignRoleToUser.executeUpdate();
+
+				connect.commit();
+				return true;
+			} catch (SQLException ex) {
+				// Nếu có lỗi, rollback toàn bộ
+				connect.rollback();
+				throw ex;
+			} finally {
+				// Luôn bật lại auto-commit về true
+				connect.setAutoCommit(true);
+			}
 		}
+
 	}
 }
