@@ -139,7 +139,7 @@ public class UserDAO {
 		User user = null;
 
 		String sql = "SELECT u.user_id, u.username, u.email, u.password, u.created_at, u.updated_at, "
-				+ "r.role_id, r.role_name, r.is_system " + "p.permission_id, p.permission_name " + "FROM users u "
+				+ "r.role_id, r.role_name, r.is_system, " + "p.permission_id, p.permission_name " + "FROM users u "
 				+ "LEFT JOIN user_roles ur ON u.user_id = ur.user_id "
 				+ "LEFT JOIN roles r ON ur.role_id = r.role_id AND r.group_id = ? "
 				+ "LEFT JOIN role_permissions rp ON r.role_id = rp.role_id "
@@ -191,13 +191,12 @@ public class UserDAO {
 
 	public List<User> getAllUsersWithRolAndPer(UUID group_id) throws SQLException {
 
-		String sql = "SELECT " + "  u.user_id, u.username, u.email, u.password, "
-				+ "  r.role_id, r.role_name, r.is_system, " + "  ug.joined_at, "
-				+ "  p.permission_id, p.permission_name " + "FROM user_groups ug "
-				+ "JOIN users u ON u.user_id = ug.user_id "
-				+ "LEFT JOIN user_roles ur ON ur.user_id = u.user_id AND ur.group_id = ug.group_id "
-				+ "LEFT JOIN roles r ON r.role_id = ur.role_id AND r.group_id = ug.group_id "
-				+ "LEFT JOIN role_permissions rp ON rp.role_id = r.role_id AND rp.group_id = r.group_id "
+		String sql = "SELECT " + "  u.user_id, " + "  u.username, " + "  u.email, " + "  u.password, " + "  r.role_id, "
+				+ "  r.role_name, " + "  r.is_system, " + "  ug.joined_at, " + "  p.permission_id, "
+				+ "  p.permission_name " + "FROM user_groups ug " + "JOIN users u ON u.user_id = ug.user_id "
+				+ "LEFT JOIN user_roles ur ON ur.user_id = u.user_id " + "LEFT JOIN roles r ON r.role_id = ur.role_id "
+				+ "  AND (r.group_id = ? OR r.is_system = true) "
+				+ "LEFT JOIN role_permissions rp ON rp.role_id = r.role_id "
 				+ "LEFT JOIN permissions p ON p.permission_id = rp.permission_id " + "WHERE ug.group_id = ? "
 				+ "ORDER BY u.user_id;";
 
@@ -206,6 +205,7 @@ public class UserDAO {
 
 		try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
 			pstmt.setObject(1, group_id);
+			pstmt.setObject(2, group_id);
 
 			try (ResultSet rs = pstmt.executeQuery()) {
 
